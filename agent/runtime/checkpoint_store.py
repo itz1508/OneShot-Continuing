@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from agent.contracts.host import Checkpoint
 from agent.runtime.canonical_serialization import digest_raw
@@ -21,6 +21,14 @@ class CompetingWriterError(CheckpointStoreError):
 
 class StaleCheckpointError(CheckpointStoreError):
     """Raised when a checkpoint write conflicts with an existing revision."""
+
+
+class CheckpointIntegrityError(CheckpointStoreError):
+    """Raised when a stored checkpoint's digest does not match its serialized state."""
+
+
+class SchemaCompatibilityError(CheckpointStoreError):
+    """Raised when the database schema is incompatible with this store."""
 
 
 class InMemoryCheckpointStore:
@@ -60,9 +68,21 @@ class CheckpointStore:
         self.db_path = self.state_root / "checkpoints.db"
         self._init_db()
 
+    _EXPECTED_COLUMNS: ClassVar[set[str]] = {"task_id", "revision", "state_json", "state_digest", "created_at"}
+
     def _init_db(self) -> None:
         conn = sqlite3.connect(str(self.db_path))
         try:
+            # Check if table exists with incompatible schema
+            existing = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='checkpoints'"
+            ).fetchone()
+            if existing is not None:
+                cols = {row[1] for row in conn.execute("PRAGMA table_info(checkpoints)")}
+                if not self._EXPECTED_COLUMNS.issubset(cols):
+                    raise SchemaCompatibilityError(
+                        f"checkpoints table has incompatible schema: expected {self._EXPECTED_COLUMNS}, got {cols}"
+                    )
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS checkpoints (
                     task_id TEXT NOT NULL,
@@ -128,6 +148,9 @@ class CheckpointStore:
         """Load the latest checkpoint for a task.
 
         Returns (revision, state, digest) or None if no checkpoint exists.
+
+        Raises CheckpointIntegrityError if the stored digest does not match
+        the serialized state (e.g. tampered bytes).
         """
         conn = sqlite3.connect(str(self.db_path))
         try:
@@ -138,7 +161,14 @@ class CheckpointStore:
             ).fetchone()
             if row is None:
                 return None
-            return row[0], json.loads(row[1]), row[2]
+            revision, state_json, stored_digest = row
+            actual_digest = digest_raw(state_json.encode("utf-8"))
+            if actual_digest != stored_digest:
+                raise CheckpointIntegrityError(
+                    f"checkpoint integrity failure for task {task_id} rev {revision}: "
+                    f"stored digest {stored_digest} != recalculated {actual_digest}"
+                )
+            return revision, json.loads(state_json), stored_digest
         finally:
             conn.close()
 
@@ -162,10 +192,25 @@ class CheckpointStore:
         finally:
             conn.close()
 
+    _ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
+        "pending": {"in_progress", "completed", "failed", "cancelled"},
+        "in_progress": {"completed", "failed"},
+        "completed": set(),
+        "failed": set(),
+        "cancelled": set(),
+    }
+
     def update_operation_status(self, op_id: int, status: str) -> None:
-        """Update an operation's status."""
+        """Update an operation's status. Rejects invalid transitions."""
         conn = sqlite3.connect(str(self.db_path))
         try:
+            row = conn.execute("SELECT status FROM operation_ledger WHERE op_id = ?", (op_id,)).fetchone()
+            if row is None:
+                raise CheckpointStoreError(f"operation {op_id} not found")
+            current = row[0]
+            allowed = self._ALLOWED_TRANSITIONS.get(current, set())
+            if status not in allowed and status != current:
+                raise CheckpointStoreError(f"invalid operation transition: {current} -> {status}")
             conn.execute(
                 "UPDATE operation_ledger SET status = ? WHERE op_id = ?",
                 (status, op_id),

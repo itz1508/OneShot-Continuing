@@ -86,6 +86,17 @@ class TestCheckpointCAS:
         store.checkpoint_cas("task-002", 0, {"stage": "init"})
         r1 = store.load_checkpoint("task-001")
         r2 = store.load_checkpoint("task-002")
-        assert r1[1] != r2[1] or True  # different tasks, could have same state
+        assert r1 is not None
+        assert r2 is not None
         assert r1[0] == 1
         assert r2[0] == 1
+        assert r1[1]["stage"] == "init"
+        assert r2[1]["stage"] == "init"
+        # Verify per-task isolation: modifying task-001 does not affect task-002
+        store.checkpoint_cas("task-001", 1, {"stage": "updated"})
+        r1_after = store.load_checkpoint("task-001")
+        r2_after = store.load_checkpoint("task-002")
+        assert r1_after[0] == 2
+        assert r2_after[0] == 1
+        assert r1_after[1]["stage"] == "updated"
+        assert r2_after[1]["stage"] == "init"

@@ -103,37 +103,46 @@ class EffectExecutor:
         file_path: str,
         expected_pre: str | None,
         expected_post: str | None,
+        attempt: int = 1,
     ) -> None:
-        """Write a durable pre-effect checkpoint to the checkpoint store."""
+        """Write a durable pre-effect checkpoint to the checkpoint store.
+
+        Includes attempt number to prevent retry identity collision.
+        """
+        checkpoint_key = f"pre-effect-{action_id}-attempt-{attempt}"
         checkpoint_data = {
             "type": "pre_effect",
             "action_id": action_id,
+            "attempt": attempt,
             "file_path": file_path,
             "expected_pre_digest": expected_pre,
             "expected_post_digest": expected_post,
         }
         self._checkpoints.checkpoint_cas(
-            f"pre-effect-{action_id}",
+            checkpoint_key,
             0,
             checkpoint_data,
         )
 
-    def _clear_pre_effect_checkpoint(self, action_id: str) -> None:
+    def _clear_pre_effect_checkpoint(self, action_id: str, attempt: int = 1) -> None:
         """Mark pre-effect checkpoint as completed by writing a completion record."""
+        checkpoint_key = f"pre-effect-{action_id}-attempt-{attempt}"
         completion_data = {
             "type": "post_effect",
             "action_id": action_id,
+            "attempt": attempt,
             "status": "completed",
         }
         self._checkpoints.checkpoint_cas(
-            f"pre-effect-{action_id}",
+            checkpoint_key,
             1,
             completion_data,
         )
 
-    def _has_pre_effect_checkpoint(self, action_id: str) -> dict[str, object] | None:
+    def _has_pre_effect_checkpoint(self, action_id: str, attempt: int = 1) -> dict[str, object] | None:
         """Check if a pre-effect checkpoint exists and is not yet completed."""
-        checkpoint = self._checkpoints.load_checkpoint(f"pre-effect-{action_id}")
+        checkpoint_key = f"pre-effect-{action_id}-attempt-{attempt}"
+        checkpoint = self._checkpoints.load_checkpoint(checkpoint_key)
         if checkpoint is None:
             return None
         _, state_dict, _ = checkpoint
@@ -150,6 +159,7 @@ class EffectExecutor:
         source_path: str | None = None,
         content: str | None = None,
         expected_source_digest: str | None = None,
+        attempt: int = 1,
     ) -> BuildActionExecution:
         """Execute a single admitted build action.
 
@@ -211,14 +221,14 @@ class EffectExecutor:
 
                 # Durable pre-effect checkpoint
                 expected_post = hashlib.sha256(content.encode()).hexdigest()
-                self._pre_effect_checkpoint(action_id, target_path, pre_digest, expected_post)
+                self._pre_effect_checkpoint(action_id, target_path, pre_digest, expected_post, attempt)
 
                 # Atomic write
                 self._write_atomic(full_path, content)
                 post_digest = hashlib.sha256(full_path.read_bytes()).hexdigest()
 
                 # Clear pre-effect checkpoint — effect completed
-                self._clear_pre_effect_checkpoint(action_id)
+                self._clear_pre_effect_checkpoint(action_id, attempt)
 
                 return BuildActionExecution(
                     action_id=action_id,
@@ -244,12 +254,12 @@ class EffectExecutor:
                     )
 
                 expected_post = hashlib.sha256(content.encode()).hexdigest()
-                self._pre_effect_checkpoint(action_id, source_path, pre_digest, expected_post)
+                self._pre_effect_checkpoint(action_id, source_path, pre_digest, expected_post, attempt)
 
                 self._write_atomic(full_path, content)
                 post_digest = hashlib.sha256(full_path.read_bytes()).hexdigest()
 
-                self._clear_pre_effect_checkpoint(action_id)
+                self._clear_pre_effect_checkpoint(action_id, attempt)
 
                 return BuildActionExecution(
                     action_id=action_id,
@@ -278,7 +288,7 @@ class EffectExecutor:
 
                 full_path.unlink()
 
-                self._clear_pre_effect_checkpoint(action_id)
+                self._clear_pre_effect_checkpoint(action_id, attempt)
 
                 return BuildActionExecution(
                     action_id=action_id,
@@ -295,7 +305,7 @@ class EffectExecutor:
 
         except Exception as e:
             # Check if pre-effect checkpoint exists — effect may be uncertain
-            if self._has_pre_effect_checkpoint(action_id):
+            if self._has_pre_effect_checkpoint(action_id, attempt):
                 return BuildActionExecution(
                     action_id=action_id,
                     status=BuildActionStatus.EFFECT_UNCERTAIN,
@@ -312,6 +322,7 @@ class EffectExecutor:
         action_id: str,
         file_path: str,
         expected_post_digest: str | None,
+        attempt: int = 1,
     ) -> BuildActionExecution:
         """Reconcile an uncertain effect after crash or interruption.
 
@@ -327,14 +338,14 @@ class EffectExecutor:
           the effect did not complete
         """
         # Check for durable pre-effect checkpoint
-        pre_checkpoint = self._has_pre_effect_checkpoint(action_id)
+        pre_checkpoint = self._has_pre_effect_checkpoint(action_id, attempt)
         if pre_checkpoint is not None:
             # A crash occurred during this effect
             full_path = Path(os.path.realpath(str(self._workspace / file_path)))
             if not full_path.exists():
                 if expected_post_digest is None:
                     # Remove action completed before crash
-                    self._clear_pre_effect_checkpoint(action_id)
+                    self._clear_pre_effect_checkpoint(action_id, attempt)
                     return BuildActionExecution(
                         action_id=action_id,
                         status=BuildActionStatus.COMPLETED,
@@ -350,7 +361,7 @@ class EffectExecutor:
             if expected_post_digest is not None:
                 if actual_digest == expected_post_digest:
                     # Effect completed before crash — reconcile
-                    self._clear_pre_effect_checkpoint(action_id)
+                    self._clear_pre_effect_checkpoint(action_id, attempt)
                     # Issue POST_EFFECT_RECONCILED receipt
                     self._receipts.issue_verified(
                         f"reconciled-{action_id}",
