@@ -37,9 +37,9 @@ disclosed as pre-existing, with the import commit above cited.
 
 Before presenting, record in this section (and in the demo):
 
-- [ ] the exact list of features newly built in this continuation effort
-- [ ] the commit range / release containing them
-- [ ] which existing OneShot capabilities were used unchanged as context
+- [x] the exact list of features newly built in this continuation effort (audited delta below)
+- [x] the commit range / release containing them (audited delta below)
+- [x] which existing OneShot capabilities were used unchanged as context (audited delta below)
 
 ## Evidence boundary
 
@@ -54,3 +54,11 @@ Before presenting, record in this section (and in the demo):
 Only include code, data, media, and assets you have the right to use. Keep
 credentials in environment variables; never commit secrets (only `.env.example`
 placeholders).
+
+## 2026-11-05T04:45:37-08:00 — Continuation delta and evidence boundary
+
+- **Inherited, not newly built:** source from `itz1508/OneShot` `78162220d545f04206a940c38e33adc031d96f2d`, imported as detached root `100365f52faf`. This includes the host, stage contracts, FastAPI/React MVP, MCP Research, read-only Audit, standalone Modal Sandbox, CI and tests.
+- **New continuation UI change:** `15303a9674b73570142785fbedaf2477806ca16a` introduced read-only configured model API metadata and connector assertions in `web/src/main.jsx` and `web/tests/connectors.spec.js`. No task-level model picker or working Call for Help hook was added.
+- **New documentation and visual work:** `52dc3a16c6b7` added the video evidence guide; later README and workflow animation work culminated in `a2c29610448a753d4ceac3da20254eca63aee30a` (`docs/workflow.gif`, `docs/workflow.html`). These are illustrations, not executed workflow stages.
+- **Observed CI:** [run 42027538233](https://github.com/itz1508/OneShot-Continuing/actions/runs/42027538233) succeeded at `a2c2961` for Python 3.11/3.12 checks. Earlier MVP and Research/Audit CI at `1280f06` succeeded. No complete connected Discovery-first Build-through-independent-E2E run was observed.
+- **Remaining work:** refer to `audit/workflow-alignment-2026-11-05.md` for implementation gaps and public-to-internal naming.

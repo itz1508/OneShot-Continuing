@@ -20,14 +20,14 @@ Accepted request + intended audience + duration + freeze policy
   ↓
 Research: existing repo, rights, real features, source revision, event contracts
   ↓
-Audit Discovery: run application; inspect screenshots, scripts, CSS, backend,
+Repository Audit (read-only Audit Discovery responsibility): inspect screenshots, scripts, CSS, backend,
                  workflows, events, real controls, current failures (read-only)
   ↓
-Planner: shot list mapping FEATURE → UI ACTION → BACKEND EVENT → EVIDENCE → TIMECODE
+Planning: shot list mapping FEATURE → UI ACTION → BACKEND EVENT → EVIDENCE → TIMECODE
   ↓
-Gap/fixture validation: check reachable endpoints and example run end to end
+Scanner (final Planning review) → fixture readiness: check reachable endpoints and example run end to end
   ↓
-Build admission: authorize only the recording/editing work; preserve frozen source
+Build Authorization (internal `build_admission`): authorize only recording/editing; preserve frozen source
   ↓
 Browser recording: actual app + actual interaction, no fake event injection
   ↓
@@ -65,13 +65,13 @@ ChatGPT Library /video_toolkit (separate source) ───► inspect + prepare
                                       Visual/E2E acceptance or BLOCKED
 ```
 
-Do not describe a running Vite frontend as proof of a connected API. For each claim (Research, Audit Discovery, Planning, Fixture Validation, Build Admission, Builder, independent verification), verify the exact host event, accepted revision, stage gate and receipt **where supported**. If not implemented or unreachable, mark the feature blocked or out of scope. Never synthesize receipt success, invent model calls, or claim a passing E2E run based on `demo.html`.
+Do not describe a running Vite frontend as proof of a connected API. For each claim (Research, Repository Audit, Planning, Fixture Validation, Build Authorization, Builder, Independent Validation), verify the exact host event, accepted revision, stage gate and receipt **where supported**. If not implemented or unreachable, mark the feature blocked or out of scope. Never synthesize receipt success, invent model calls, or claim a passing E2E run based on `demo.html`.
 
 ## Visual design, if a new interface is explicitly authorized
 
 The desired concept is **not yet a verified implementation**: the robot stays visually anchored, with subtle blink/face changes and occasional natural talking/asking gestures; information flows in the **left** channel; the **right** changes work screens/pages, with recognizable pagination dots. Show only current-state data from the run: workstream, file actions, actual capability names and receipts. Use current `web/src/styles.css` navy/cyan tokens unless the user approves new tokens. Keep the UI readable at desktop `1440×900` and mobile `390×844` and preserve the single System Chat context. The center robot must not hop between unrelated layouts; no duplicated status panels, endless spinning, fake progress, or pagers that do not switch views.
 
-To build this concept later, **Planner** must specify the actual layout/component/animation changes and verification fixtures before Builder implementation. Only after the real browser shows it may it appear in a working-product demo. Until then, creative illustrations may appear **only** as separately labeled concept artwork, never as screenshots of running OneShot.
+To build this concept later, **Planning** must specify the actual layout/component/animation changes and verification fixtures before Builder implementation. Only after the real browser shows it may it appear in a working-product demo. Until then, creative illustrations may appear **only** as separately labeled concept artwork, never as screenshots of running OneShot.
 
 ## Recording and media commands
 
