@@ -1,0 +1,43 @@
+# Secrets and environment
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# Cache
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# State (runtime data, not source)
+*.db
+oneshot-state/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local MVP runtime and frontend dependencies
+.oneshot-state/
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
