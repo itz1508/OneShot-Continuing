@@ -13,7 +13,9 @@ OneShot separates AI research and planning from execution authority. It records 
 
 > **Documentation status (2026-11-05):** This diagram describes the intended workflow, not confirmed runtime behavior. It does not alter application code, workflow contracts, authorization, or tests.
 
-![Evidence-driven build workflow](docs/workflow.gif)
+[![OneShot intended workflow with Catalog, Scanner, approval, sandbox execution, and independent validation](docs/workflow.gif)](docs/workflow.gif)
+
+*Open the animation for a full-size view. The main flow runs top to bottom; Catalog and Scanner support it from the sides.*
 
 The central vertical path shows the ordered workflow. Catalog guidance and correction routes branch horizontally. **The host controls routing, state, approval enforcement, execution authorization, and evidence retention.** The animation is an architectural explanation, not a recording of a successful run.
 
