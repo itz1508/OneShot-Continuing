@@ -23,6 +23,14 @@ class StaleCheckpointError(CheckpointStoreError):
     """Raised when a checkpoint write conflicts with an existing revision."""
 
 
+def require_next_revision(current: int, expected_previous: int, revision: int) -> None:
+    """Apply the shared Checkpoint model CAS rule before either store writes."""
+    if expected_previous != current:
+        raise StaleCheckpointError(f"Expected {expected_previous}, found {current}")
+    if revision != current + 1:
+        raise StaleCheckpointError("Revision must increase by one")
+
+
 class InMemoryCheckpointStore:
     """In-memory checkpoint store with CAS semantics for testing."""
 
@@ -36,10 +44,7 @@ class InMemoryCheckpointStore:
         revision = checkpoint.checkpoint_revision
         existing = self._store.get(cid)
         current = 0 if existing is None else existing.checkpoint_revision
-        if expected != current:
-            raise StaleCheckpointError(f"Expected {expected}, found {current}")
-        if revision != current + 1:
-            raise StaleCheckpointError("Revision must increase by one")
+        require_next_revision(current, expected, revision)
         self._store[cid] = checkpoint
 
     def get(self, checkpoint_id: str) -> Checkpoint | None:

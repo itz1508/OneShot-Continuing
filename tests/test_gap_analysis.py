@@ -35,15 +35,24 @@ def test_missing_capability_reports_producer_symbol_and_consumer_gaps() -> None:
     }
 
 
-def test_current_repository_uses_canonical_gap_owner_and_finds_real_missing_capabilities() -> None:
+def test_current_repository_closes_the_accepted_capability_set() -> None:
     result = audit_repository(".")
-    gaps_by_capability = {gap.capability_id for gap in result.gaps}
+    assert result.gaps == ()
+    assert result.diagnostic_status is DiagnosticStatus.VALID
 
-    assert "gap_analysis_owner" not in gaps_by_capability
-    assert "reference_closure" not in gaps_by_capability
-    assert "execution_trace" not in gaps_by_capability
-    assert "scanner_check_registry" in gaps_by_capability
-    assert "runtime_root_registry" in gaps_by_capability
-    assert "recovery_readiness" in gaps_by_capability
-    assert "wave_preimage_pinning" in gaps_by_capability
-    assert result.diagnostic_status is DiagnosticStatus.NOT_VALID
+
+def test_missing_producer_file_still_detected_from_synthetic_snapshot() -> None:
+    requirements = (
+        CapabilityRequirement(
+            capability_id="scanner_check_registry",
+            producers=(
+                CapabilityProducer(path="agent/runtime/scanner_check_registry.py", symbols=("ScannerCheckRegistry",)),
+            ),
+        ),
+    )
+    result = MissingCapabilityAnalyzer().analyze(
+        RepositorySnapshot(source_id="fixture:missing", files={}), requirements
+    )
+    assert [(gap.kind, gap.path) for gap in result.gaps] == [
+        ("missing_producer", "agent/runtime/scanner_check_registry.py")
+    ]

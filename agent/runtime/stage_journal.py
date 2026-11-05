@@ -14,6 +14,7 @@ from pathlib import Path
 from agent.contracts.host import ReceiptRef
 from agent.contracts.stage_log import StageLogEvent, StageName
 from agent.runtime.receipt_store import ReceiptStore
+from agent.runtime.runtime_root_registry import RuntimeRootRegistry
 
 STAGES: tuple[StageName, ...] = ("search", "audit", "plan", "build", "mem")
 
@@ -23,6 +24,11 @@ class StageJournalError(ValueError):
 
 
 class StageJournalService:
+    @classmethod
+    def from_registry(cls, roots: RuntimeRootRegistry, root_id: str, event_db_path: str | Path) -> StageJournalService:
+        """Bind journal projections to a host-registered runtime root."""
+        return cls(roots.resolve(root_id), event_db_path)
+
     def __init__(self, runtime_root: str | Path, event_db_path: str | Path) -> None:
         Path(runtime_root).mkdir(parents=True, exist_ok=True)
         self._root = Path(runtime_root).resolve(strict=True)

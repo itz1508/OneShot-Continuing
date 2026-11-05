@@ -6,9 +6,15 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from agent.contracts.build import BuildActionStatus
+from agent.contracts.build import BuildActionStatus, BuildRecord
+from agent.contracts.build_validation import (
+    BuildValidationRecord,
+    CriterionResult,
+    E2EResult,
+    ObservedCriterionResult,
+)
 from agent.contracts.common import ArtifactRef
-from agent.contracts.host import ReceiptRef
+from agent.contracts.host import HostDispatchResult, ReceiptRef
 from agent.contracts.research import (
     AuthorizationStatus,
     CriteriaStatus,
@@ -27,6 +33,7 @@ from agent.runtime.controller import STAGE_ORDER, HostController, Stage, Transit
 from agent.runtime.effect_executor import EffectExecutor
 from agent.runtime.receipt_store import ReceiptStore
 from agent.runtime.scanner_gateway import ScannerGateway
+from tests.fixtures.scanner import passing_scan
 from tests.fixtures.structural_gap import passing_gap
 
 LOCK_SUBJECT = "package_lock"
@@ -36,7 +43,7 @@ class _WorkFixture(BaseModel):
     label: str
 
 
-def _completed_work_todo(controller, task_id, run_id, stage):
+def _completed_work_todo(controller, task_id, run_id, stage, output_ref=None):
     """Record actual persisted test evidence before accepting a simulated stage."""
     request_id = f"request-{stage.value}"
     request_name = f"fixture-input-{task_id}-{run_id}-{stage.value}"
@@ -66,17 +73,18 @@ def _completed_work_todo(controller, task_id, run_id, stage):
         expected_result=f"Verified {stage.value} fixture output",
     )
     _work, running = controller.work_todos.set_status(todo_ref, "work-1", WorkStatus.RUNNING)
-    output_digest = controller.artifact_store.put_immutable(
-        _WorkFixture(label=f"observed {stage.value}"), evidence_name, 1, "fixture", "1.0"
-    )
-    output_ref = ArtifactRef(
-        artifact_id=evidence_name,
-        artifact_revision=1,
-        artifact_digest=output_digest,
-        contract_id="fixture",
-        contract_version="1.0",
-        serializer_profile=SERIALIZER_PROFILE,
-    )
+    if output_ref is None:
+        output_digest = controller.artifact_store.put_immutable(
+            _WorkFixture(label=f"observed {stage.value}"), evidence_name, 1, "fixture", "1.0"
+        )
+        output_ref = ArtifactRef(
+            artifact_id=evidence_name,
+            artifact_revision=1,
+            artifact_digest=output_digest,
+            contract_id="fixture",
+            contract_version="1.0",
+            serializer_profile=SERIALIZER_PROFILE,
+        )
     _work, completed = controller.work_todos.set_status(
         running,
         "work-1",
@@ -94,6 +102,7 @@ def _advance_with_receipt(controller, task_id, run_id, stage):
     if stage is Stage.PLANNING:
         gap = passing_gap(controller)
         assert gap.completion_receipt_ref is not None
+        scanner_evidence = passing_scan(controller, gap)
         return controller.advance_stage(
             task_id,
             run_id,
@@ -101,9 +110,72 @@ def _advance_with_receipt(controller, task_id, run_id, stage):
             receipt,
             gap_result_ref=gap.result_ref,
             gap_receipt_ref=gap.completion_receipt_ref,
+            scanner_evidence=scanner_evidence,
             todo_ref=todo_ref,
         )
     return controller.advance_stage(task_id, run_id, stage, receipt, todo_ref=todo_ref)
+
+
+def _build_verification_ref(controller, *, outcome=CriterionResult.VALID):
+    placeholder = ArtifactRef(
+        artifact_id="test-placeholder",
+        artifact_revision=1,
+        artifact_digest="a" * 64,
+        contract_id="test_placeholder",
+        contract_version="1.0",
+        serializer_profile=SERIALIZER_PROFILE,
+    )
+    build = BuildRecord(
+        task_id="task-001", run_id="run-001", stage_revision=1, lock_ref=placeholder, admission_ref=placeholder
+    )
+    build_digest = controller.artifact_store.put_immutable(build, "test-build-record", 1, "build_record", "1.0")
+    build_ref = placeholder.model_copy(
+        update={"artifact_id": "test-build-record", "artifact_digest": build_digest, "contract_id": "build_record"}
+    )
+    issue_input = None
+    if outcome is not CriterionResult.VALID:
+        from agent.contracts.build_validation import ValidationIssueInput
+        from agent.contracts.common import DiagnosticStatus
+
+        issue_input = ValidationIssueInput(
+            issue_type="verifiability", reason="Verifier did not pass", evidence_status=DiagnosticStatus.NOT_VALID
+        )
+    record = BuildValidationRecord(
+        task_id="task-001",
+        run_id="run-001",
+        stage_revision=1,
+        build_ref=build_ref,
+        criterion_results=(
+            ObservedCriterionResult(
+                criterion_id="AC-001",
+                observed_result="Observed product behavior",
+                outcome=outcome,
+                evidence_refs=("test-check",),
+                independent_observation="Verifier checked the outcome",
+                issue_input=issue_input,
+            ),
+        ),
+        e2e_results=(
+            E2EResult(
+                e2e_id="E2E-001",
+                entrypoint="test-check",
+                exit_code=0 if outcome is CriterionResult.VALID else 1,
+                outcome=outcome,
+                evidence_refs=("test-check",),
+                issue_input=issue_input,
+            ),
+        ),
+    )
+    digest = controller.artifact_store.put_immutable(
+        record, "test-build-verification", 1, "build_validation_record", "1.0"
+    )
+    return build_ref.model_copy(
+        update={
+            "artifact_id": "test-build-verification",
+            "artifact_digest": digest,
+            "contract_id": "build_validation_record",
+        }
+    )
 
 
 def _make_admission(receipts, action_ids=("act-001",), lock_subject=LOCK_SUBJECT):
@@ -157,7 +229,6 @@ class TestE2EWorkflow:
             Stage.PLANNING,
             Stage.FIXTURE_VALIDATION,
             Stage.BUILD,
-            Stage.BUILD_VALIDATION,
         )
         assert expected == STAGE_ORDER
 
@@ -206,6 +277,17 @@ class TestE2EWorkflow:
 
         gap = passing_gap(controller)
         assert gap.completion_receipt_ref is not None
+        with pytest.raises(TransitionError, match="Scanner coverage"):
+            controller.advance_stage(
+                "task-001",
+                "run-001",
+                Stage.PLANNING,
+                receipt,
+                gap_result_ref=gap.result_ref,
+                gap_receipt_ref=gap.completion_receipt_ref,
+                todo_ref=todo_ref,
+            )
+        scanner_evidence = passing_scan(controller, gap)
         state = controller.advance_stage(
             "task-001",
             "run-001",
@@ -213,6 +295,7 @@ class TestE2EWorkflow:
             receipt,
             gap_result_ref=gap.result_ref,
             gap_receipt_ref=gap.completion_receipt_ref,
+            scanner_evidence=scanner_evidence,
             todo_ref=todo_ref,
         )
         assert state.current_stage == Stage.FIXTURE_VALIDATION
@@ -273,16 +356,111 @@ class TestScenarios:
         for stage in STAGE_ORDER[:-1]:
             _advance_with_receipt(controller, "task-001", "run-001", stage)
         state = controller.get_state("task-001")
-        assert state.current_stage == Stage.BUILD_VALIDATION
-        final_ref = _completed_work_todo(controller, "task-001", "run-001", Stage.BUILD_VALIDATION)
-        final_receipt = controller.issue_stage_receipt(Stage.BUILD_VALIDATION, task_id="task-001", run_id="run-001")
+        assert state.current_stage == Stage.BUILD
+        verification_ref = _build_verification_ref(controller)
+        verification = BuildValidationRecord.model_validate_json(
+            controller.artifact_store.get_verified(verification_ref.artifact_id, verification_ref.artifact_revision)
+        )
+        envelope, _, pending = controller.prepare_agent_dispatch(
+            "task-001",
+            verification.build_ref,
+            "Verify the integrated Build",
+            requested_role="build_verifier",
+        )
+        assert envelope.stage == "build"
+        assert envelope.role == "build_verifier"
+        final_receipt = controller.issue_stage_receipt(
+            Stage.BUILD,
+            task_id="task-001",
+            run_id="run-001",
+            artifact_id=verification_ref.artifact_id,
+            revision=verification_ref.artifact_revision,
+            artifact_digest=verification_ref.artifact_digest,
+        )
+        with pytest.raises(TransitionError, match="independent verification evidence"):
+            controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=pending)
+        controller.receive_agent_result(
+            envelope,
+            HostDispatchResult(
+                task_id=envelope.task_id,
+                run_id=envelope.run_id,
+                stage=envelope.stage,
+                role=envelope.role,
+                request_id=envelope.request_id,
+                request_revision=envelope.request_revision,
+                respond_to=envelope.respond_to,
+                output_ref=verification_ref,
+            ),
+        )
+        _, running = controller.work_todos.set_status(pending, "work-1", WorkStatus.RUNNING)
+        _, final_ref = controller.work_todos.set_status(
+            running,
+            "work-1",
+            WorkStatus.COMPLETED,
+            actual_result="Independent verification passed",
+            evidence_refs=(verification_ref,),
+        )
         with pytest.raises(TransitionError, match="final-stage work list"):
             controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=None)
         state = controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=final_ref)
-        assert Stage.BUILD_VALIDATION in state.completed_stages
+        assert Stage.BUILD in state.completed_stages
         from agent.cli import cmd_verify
 
         assert cmd_verify("task-001", state_root=str(tmp_path)) == 0
+
+    def test_final_build_rejects_failed_independent_verification(self, tmp_path):
+        controller = HostController(state_root=tmp_path)
+        controller.init_task("task-001", "run-001")
+        for stage in STAGE_ORDER[:-1]:
+            _advance_with_receipt(controller, "task-001", "run-001", stage)
+        verification_ref = _build_verification_ref(controller, outcome=CriterionResult.NOT_VALID)
+        verification = BuildValidationRecord.model_validate_json(
+            controller.artifact_store.get_verified(verification_ref.artifact_id, verification_ref.artifact_revision)
+        )
+        envelope, _, pending = controller.prepare_agent_dispatch(
+            "task-001", verification.build_ref, "Verify the integrated Build", requested_role="build_verifier"
+        )
+        controller.receive_agent_result(
+            envelope,
+            HostDispatchResult(
+                task_id=envelope.task_id,
+                run_id=envelope.run_id,
+                stage=envelope.stage,
+                role=envelope.role,
+                request_id=envelope.request_id,
+                request_revision=envelope.request_revision,
+                respond_to=envelope.respond_to,
+                output_ref=verification_ref,
+            ),
+        )
+        _, running = controller.work_todos.set_status(pending, "work-1", WorkStatus.RUNNING)
+        _, completed = controller.work_todos.set_status(
+            running,
+            "work-1",
+            WorkStatus.COMPLETED,
+            actual_result="Independent verification failed",
+            evidence_refs=(verification_ref,),
+        )
+        receipt = controller.issue_stage_receipt(
+            Stage.BUILD,
+            task_id="task-001",
+            run_id="run-001",
+            artifact_id=verification_ref.artifact_id,
+            revision=verification_ref.artifact_revision,
+            artifact_digest=verification_ref.artifact_digest,
+        )
+        with pytest.raises(TransitionError, match="passing independent verification"):
+            controller.complete_final_stage("task-001", "run-001", receipt, completed)
+        assert Stage.BUILD not in controller.get_state("task-001").completed_stages
+        rework_ref = controller.route_validation_rework("task-001", "run-001", verification_ref)
+        from agent.contracts.build_validation import PlanningReworkInput
+
+        rework = PlanningReworkInput.model_validate_json(
+            controller.artifact_store.get_verified(rework_ref.artifact_id, rework_ref.artifact_revision)
+        )
+        assert rework.planning_revision == 2
+        assert {source.issue.issue_type for source in rework.issue_sources} == {"verifiability"}
+        assert controller.get_state("task-001").current_stage is Stage.PLANNING
 
     def test_s2_unsupported_claim_do_not_use(self, tmp_path):
         """S2: Unsupported capability returns BLOCKED, not pass."""
@@ -347,8 +525,8 @@ class TestScenarios:
         assert result.outcome.value == "pass"
         assert "syntax" in result.capabilities_checked
 
-    def test_s2d_scanner_blocks_with_detector_findings(self, tmp_path):
-        """S2d: Scanner blocks when detector finds issues."""
+    def test_s2d_scanner_fails_with_detector_findings(self, tmp_path):
+        """S2d: Scanner fails when a completed check finds issues."""
         store, digest = _store_artifact(tmp_path)
         scanner = ScannerGateway(artifact_store=store)
 
@@ -373,7 +551,7 @@ class TestScenarios:
             serializer_profile="rfc8785-jcs-sha256-v1",
         )
         result = scanner.scan_exact(ref, "repo-001", ("syntax",))
-        assert result.outcome.value == "blocked"
+        assert result.outcome.value == "fail"
         assert len(result.findings) > 0
 
     def test_s2e_scanner_blocks_without_detector(self, tmp_path):

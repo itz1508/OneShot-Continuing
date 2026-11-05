@@ -19,6 +19,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.pytest-*/
 *.egg-info/
 
 # State (runtime data, not source)

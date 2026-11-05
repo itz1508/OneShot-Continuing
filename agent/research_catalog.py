@@ -8,11 +8,14 @@ synthetic with no factual authority.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import Field
 
+from agent.contracts.common import ContractModel, Sha256
 from agent.contracts.research import (
     CatalogMatch,
     CatalogMatchStatus,
@@ -32,6 +35,17 @@ class CatalogSample:
     research_checklist: tuple[str, ...]
     success_criteria: tuple[str, ...]
     fixture_blueprint: dict[str, Any] | None = None
+    is_synthetic: bool = True
+
+
+class CatalogLineage(ContractModel):
+    """Exact synthetic catalog source bound to one admitted Research input."""
+
+    input_id: str = Field(min_length=1)
+    catalog_id: str = Field(min_length=1)
+    catalog_version: str = Field(min_length=1)
+    match_status: CatalogMatchStatus
+    source_digest: Sha256
     is_synthetic: bool = True
 
 
@@ -112,6 +126,24 @@ class ResearchCatalog:
         if not self._loaded:
             self.load()
         return tuple(s.catalog_id for s in self._samples)
+
+    def lineage_for(self, input_id: str, match: CatalogMatch) -> CatalogLineage:
+        """Bind a match to the current catalog bytes without promoting it to evidence."""
+        if not self._loaded:
+            self.load()
+        if not match.is_synthetic or match.catalog_id not in {*self.sample_ids, "NONE", "AMBIGUOUS"}:
+            raise ValueError("catalog match is not from the loaded synthetic catalog")
+        if match.catalog_id not in {"NONE", "AMBIGUOUS"}:
+            sample = self.get_sample(match.catalog_id)
+            if sample is None or sample.version != match.catalog_version:
+                raise ValueError("catalog version changed before lineage capture")
+        return CatalogLineage(
+            input_id=input_id,
+            catalog_id=match.catalog_id,
+            catalog_version=match.catalog_version,
+            match_status=match.match_status,
+            source_digest=sha256(self._samples_path.read_bytes()).hexdigest(),
+        )
 
     def match(
         self,

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from agent.contracts.common import ArtifactRef
 from agent.contracts.host import BuildAdmissionReceipt, PackageLockReceipt, ReceiptRef, admission_receipt_subject
 from agent.contracts.planning import BuildSpecification, CandidateSpecification, PlanningRecord
 from agent.contracts.validation.structural import tool_invocation_gaps
 from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.canonical_serialization import digest_raw
 from agent.runtime.receipt_store import ReceiptStore
+from agent.runtime.recovery_readiness import verify_recovery_readiness
 from agent.runtime.tool_registry import load_pinned_tool_registry
 
 
@@ -50,7 +52,7 @@ class BuildAdmission:
         lock_receipt_ref: ReceiptRef,
         authorized_action_ids: tuple[str, ...],
         lock_subject: str,
-        recovery_readiness_ref: str | None = None,
+        recovery_readiness_ref: ArtifactRef | None = None,
         issuer_id: str = "host",
         *,
         build_spec: BuildSpecification | None = None,
@@ -96,6 +98,12 @@ class BuildAdmission:
             if any(action_id not in action_map for action_id in authorized_action_ids):
                 raise BuildAdmissionError("admission contains unknown action ids")
             actions = tuple(action_map[action_id] for action_id in authorized_action_ids)
+            if recovery_readiness_ref is None:
+                raise BuildAdmissionError("verified recovery readiness required for frozen Build")
+            try:
+                verify_recovery_readiness(self._artifacts, recovery_readiness_ref)
+            except (ValueError, LookupError) as exc:
+                raise BuildAdmissionError("recovery readiness evidence unavailable") from exc
             invocations = tuple(inv for action in actions for inv in action.verification_tools)
             if invocations:
                 if registry_ref is None:
@@ -111,7 +119,9 @@ class BuildAdmission:
                 authorized_tools = tuple(sorted({inv.tool_id for inv in invocations}))
 
         receipt_id = f"admission-{admission_id}"
-        subject = admission_receipt_subject(lock_receipt_ref, authorized_action_ids, authorized_tools, registry_ref)
+        subject = admission_receipt_subject(
+            lock_receipt_ref, authorized_action_ids, authorized_tools, registry_ref, recovery_readiness_ref
+        )
         _, receipt_digest = self._receipts.issue_verified(receipt_id, issuer_id, subject)
         return BuildAdmissionReceipt(
             admission_id=admission_id,

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from agent.contracts.build_schedule import BuildBatch, BuildTask, BuildWave
 from agent.contracts.common import ArtifactRef
+from agent.contracts.host import ReceiptRef
 from agent.contracts.planning import (
     BuildAction,
     BuildSpecification,
@@ -88,4 +90,28 @@ def compile_build(spec: BuildSpecification, frozen_plan_ref: ArtifactRef) -> Bui
         frozen_plan_ref=frozen_plan_ref,
         todos=todos,
         waves=tuple(waves),
+    )
+
+
+def compile_build_wave(
+    build: Build,
+    wave_index: int,
+    observed_preimages: dict[str, str | None],
+    previous_wave_result_ref: ArtifactRef | None = None,
+    previous_wave_receipt_ref: ReceiptRef | None = None,
+) -> BuildWave:
+    """Bind an admitted wave to the host's current preimage observations."""
+    if wave_index < 1 or wave_index > len(build.waves):
+        raise ValueError("unknown Build wave")
+    todos = {todo.todo_id: todo for todo in build.todos}
+    selected = build.waves[wave_index - 1]
+    tasks = tuple(BuildTask(task_id=todo_id, todo=todos[todo_id]) for todo_id in selected)
+    batch = BuildBatch(batch_id=f"{build.build_id}:batch:{wave_index}", tasks=tasks)
+    return BuildWave(
+        wave_id=f"{build.build_id}:wave:{wave_index}",
+        wave_index=wave_index,
+        batches=(batch,),
+        expected_preimages=observed_preimages,
+        previous_wave_result_ref=previous_wave_result_ref,
+        previous_wave_receipt_ref=previous_wave_receipt_ref,
     )

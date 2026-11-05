@@ -113,26 +113,46 @@ def test_scanner_dispatch_accepts_only_exact_candidate_and_receipt(tmp_path) -> 
     request, runner = build_gap_inputs(controller)
     outcome = controller.run_structural_gap_analysis(request, walking_skeleton_runner=runner)
     assert outcome.completion_receipt_ref is not None
-    controller.scanner.register_detector("syntax", lambda _content: ())
+    from tests.fixtures.scanner import passing_scan
+
+    scanner_evidence = passing_scan(controller, outcome)
+    assert controller.planning_ready_for_approval(
+        request.task_id,
+        request.run_id,
+        request.candidate_specification_ref,
+        outcome.result_ref,
+        outcome.completion_receipt_ref,
+        scanner_evidence,
+    )
     result = controller.scan_planning_candidate(
         request.task_id,
         request.run_id,
         request.candidate_specification_ref,
         "repo-snapshot",
-        ("syntax",),
+        ("syntax", "types"),
         outcome.result_ref,
         outcome.completion_receipt_ref,
     )
-    assert result.outcome == ScannerOutcome.PASS
+    assert result.result.outcome == ScannerOutcome.PASS
+    assert result.evidence is not None
 
     wrong = request.candidate_specification_ref.model_copy(update={"artifact_id": "different-candidate"})
-    with pytest.raises(TransitionError, match="different candidate"):
+    with pytest.raises(TransitionError, match="another candidate"):
+        controller.planning_ready_for_approval(
+            request.task_id,
+            request.run_id,
+            wrong,
+            outcome.result_ref,
+            outcome.completion_receipt_ref,
+            scanner_evidence,
+        )
+    with pytest.raises(TransitionError, match="another candidate"):
         controller.scan_planning_candidate(
             request.task_id,
             request.run_id,
             wrong,
             "repo-snapshot",
-            ("syntax",),
+            ("syntax", "types"),
             outcome.result_ref,
             outcome.completion_receipt_ref,
         )

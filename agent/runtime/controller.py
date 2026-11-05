@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import HostDispatchEnvelope, HostDispatchResult, ReceiptRef
-from agent.contracts.scanner import ScannerResult
+from agent.contracts.scanner import ScannerEvidence
 from agent.contracts.work_todo import TodoList, WorkBinding
 from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.authorization import AuthorizationEngine
@@ -24,11 +24,13 @@ from agent.runtime.host_gap_analyzer import (
     StructuralGapOutcome,
     StructuralGapRequest,
     StructuralGapResult,
-    structural_gap_receipt_subject,
+    verify_structural_pass,
 )
 from agent.runtime.providers.registry import ProviderRegistry
 from agent.runtime.receipt_store import ReceiptStore
 from agent.runtime.recovery import BoundedRecovery
+from agent.runtime.scanner_check_registry import ScannerCheckRegistry
+from agent.runtime.scanner_evidence import ScannerScanOutcome, persist_scan_result, verify_scanner_evidence
 from agent.runtime.scanner_gateway import ScannerGateway
 from agent.runtime.work_todo import WorkTodoError, WorkTodoManager
 
@@ -39,7 +41,6 @@ class Stage(StrEnum):
     PLANNING = "planning"
     FIXTURE_VALIDATION = "fixture_validation"
     BUILD = "build"
-    BUILD_VALIDATION = "build_validation"
 
 
 STAGE_ORDER = (
@@ -48,7 +49,6 @@ STAGE_ORDER = (
     Stage.PLANNING,
     Stage.FIXTURE_VALIDATION,
     Stage.BUILD,
-    Stage.BUILD_VALIDATION,
 )
 
 
@@ -62,6 +62,9 @@ class TaskState(BaseModel):
     current_stage: Stage = Stage.RESEARCH
     completed_stages: tuple[Stage, ...] = ()
     active_work_artifact_id: str | None = None
+    build_verification_artifact_id: str | None = None
+    build_verification_digest: str | None = None
+    planning_revision: int = Field(default=1, ge=1)
 
     model_config = {"frozen": True}
 
@@ -88,6 +91,7 @@ class HostController:
         self.work_todos = WorkTodoManager(self.artifact_store, self.event_store)
         self.checkpoint_store = CheckpointStore(self.state_root)
         self.scanner = ScannerGateway(self.artifact_store)
+        self.scanner_checks: ScannerCheckRegistry | None = None
         self.gap_analyzer = HostGapAnalyzer(self.artifact_store, self.receipt_store)
         self.recovery = BoundedRecovery()
         self.providers = ProviderRegistry()
@@ -106,6 +110,7 @@ class HostController:
         completion_receipt_ref: ReceiptRef | None = None,
         gap_result_ref: ArtifactRef | None = None,
         gap_receipt_ref: ReceiptRef | None = None,
+        scanner_evidence: ScannerEvidence | None = None,
         todo_ref: ArtifactRef | None = None,
     ) -> TaskState:
         """Advance to the next stage if the current stage is completed.
@@ -127,7 +132,8 @@ class HostController:
 
         receipt_artifact = self._verify_stage_receipt(state, completion_receipt_ref)
         if state.current_stage is Stage.PLANNING:
-            self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref)
+            gap_result = self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref)
+            self._verify_scanner_pass(task_id, run_id, gap_result.candidate_specification_ref, scanner_evidence)
 
         # Task tracking is a mandatory observation gate, never permission to execute.
         if todo_ref is None:
@@ -151,6 +157,7 @@ class HostController:
             run_id=run_id,
             current_stage=new_stage,
             completed_stages=completed,
+            planning_revision=state.planning_revision,
         )
 
         expected_rev = checkpoint[0] if checkpoint else 0
@@ -163,7 +170,12 @@ class HostController:
         except CompetingWriterError as e:
             raise TransitionError(f"checkpoint CAS failed: {e}") from e
 
-        self.event_store.append(task_id, "stage_transition", f"{state.current_stage} -> {new_stage}")
+        self.event_store.append(
+            task_id,
+            "stage_transition",
+            f"{state.current_stage} -> {new_stage}",
+            event_id=f"stage-transition:{task_id}:{run_id}:{expected_rev + 1}",
+        )
         return new_state
 
     def _verify_stage_receipt(self, state: TaskState, completion_receipt_ref: ReceiptRef | None) -> ArtifactRef:
@@ -234,36 +246,58 @@ class HostController:
         """Verify a persisted result and trusted pass receipt for this exact candidate."""
         if gap_result_ref is None or gap_receipt_ref is None:
             raise TransitionError("structural gap analysis receipt and result required")
-        if gap_receipt_ref.issuer_id != "host":
-            raise TransitionError("untrusted structural gap completion issuer")
         try:
-            digest = self.artifact_store.get_digest(gap_result_ref.artifact_id, gap_result_ref.artifact_revision)
-            if digest != gap_result_ref.artifact_digest:
-                raise ValueError("structural gap artifact digest mismatch")
-            if gap_result_ref.contract_id != "structural_analysis_result":
-                raise ValueError("incorrect structural gap result contract")
-            raw = self.artifact_store.get_verified(gap_result_ref.artifact_id, gap_result_ref.artifact_revision)
-            result = StructuralGapResult.model_validate_json(raw)
-            if result.task_id != task_id or result.run_id != run_id:
-                raise ValueError("structural gap result belongs to another task or run")
-            if result.execution_status != "completed" or result.findings:
-                raise ValueError("structural gap analysis did not pass")
-            if result.known_critical_gap_detection_rate != 1.0 or not result.walking_skeleton_completed:
-                raise ValueError("structural gap backtest or walking skeleton incomplete")
-            candidate = result.candidate_specification_ref
-            if (
-                self.artifact_store.get_digest(candidate.artifact_id, candidate.artifact_revision)
-                != candidate.artifact_digest
-            ):
-                raise ValueError("Planning candidate changed since structural analysis")
-            subject = structural_gap_receipt_subject(result, digest)
-            if not self.receipt_store.verify(gap_receipt_ref.receipt_id, gap_receipt_ref.receipt_digest, subject):
-                raise ValueError("structural gap completion receipt is not verified")
+            return verify_structural_pass(
+                self.artifact_store,
+                self.receipt_store,
+                task_id,
+                run_id,
+                gap_result_ref,
+                gap_receipt_ref,
+                candidate_ref,
+            )
         except Exception as exc:
             raise TransitionError(f"invalid structural gap evidence: {exc}") from exc
-        if candidate_ref is not None and result.candidate_specification_ref != candidate_ref:
-            raise TransitionError("structural gap pass belongs to a different candidate")
-        return result
+
+    def configure_scanner_checks(self, registry_ref: ArtifactRef) -> None:
+        """Load exact host-pinned check requirements; missing tools fail closed."""
+        self.scanner_checks = ScannerCheckRegistry(self.artifact_store, registry_ref)
+
+    def planning_ready_for_approval(
+        self,
+        task_id: str,
+        run_id: str,
+        candidate_ref: ArtifactRef,
+        gap_result_ref: ArtifactRef | None,
+        gap_receipt_ref: ReceiptRef | None,
+        scanner_evidence: ScannerEvidence | None,
+    ) -> bool:
+        """Read-only host gate for the exact proposed Planning candidate."""
+        self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
+        self._verify_scanner_pass(task_id, run_id, candidate_ref, scanner_evidence)
+        return True
+
+    def _verify_scanner_pass(
+        self,
+        task_id: str,
+        run_id: str,
+        candidate_ref: ArtifactRef,
+        evidence: ScannerEvidence | None,
+    ) -> None:
+        if self.scanner_checks is None or evidence is None:
+            raise TransitionError("verified Scanner coverage required for Planning")
+        try:
+            verify_scanner_evidence(
+                self.artifact_store,
+                self.receipt_store,
+                evidence,
+                candidate_ref,
+                self.scanner_checks,
+                task_id,
+                run_id,
+            )
+        except Exception as exc:
+            raise TransitionError(f"invalid Scanner evidence: {exc}") from exc
 
     def scan_planning_candidate(
         self,
@@ -274,10 +308,31 @@ class HostController:
         capabilities: tuple[str, ...],
         gap_result_ref: ArtifactRef | None,
         gap_receipt_ref: ReceiptRef | None,
-    ) -> ScannerResult:
+    ) -> ScannerScanOutcome:
         """Host Scanner dispatch; always reject an unvalidated Planning candidate."""
         self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
-        return self.scanner.scan_exact(candidate_ref, repository_identity, capabilities)
+        if self.scanner_checks is None:
+            raise TransitionError("Scanner check registry is not configured")
+        if not repository_identity:
+            raise TransitionError("Scanner repository identity is required")
+        required_capabilities = self.scanner_checks.required_capabilities
+        if capabilities != required_capabilities:
+            raise TransitionError("Scanner request does not cover the required registry checks")
+        result = self.scanner.scan_exact(
+            candidate_ref, repository_identity, required_capabilities, self.scanner_checks.ref
+        ).model_copy(update={"task_id": task_id, "run_id": run_id})
+        from agent.contracts.planning_coverage import planning_coverage
+        from agent.contracts.validation.structural import CONCERNS
+
+        result = result.model_copy(
+            update={
+                "planning_coverage": planning_coverage(
+                    structural_concerns=CONCERNS,
+                    scanner_capabilities=result.capabilities_checked,
+                )
+            }
+        )
+        return persist_scan_result(self.artifact_store, self.receipt_store, result, self.scanner_checks)
 
     def run_structural_gap_analysis(
         self,
@@ -295,7 +350,7 @@ class HostController:
         completion_receipt_ref: ReceiptRef | None,
         todo_ref: ArtifactRef | None,
     ) -> TaskState:
-        """Mark Build Verification completed only after its assigned work is verified."""
+        """Complete Build only after independent verification and assigned work pass."""
         checkpoint = self.checkpoint_store.load_checkpoint(task_id)
         if checkpoint is None:
             raise TransitionError("task has no checkpoint")
@@ -303,9 +358,10 @@ class HostController:
         state = TaskState(**state_dict)
         if state.run_id != run_id or state.task_id != task_id:
             raise TransitionError("final stage task/run mismatch")
-        if state.current_stage is not Stage.BUILD_VALIDATION or Stage.BUILD_VALIDATION in state.completed_stages:
-            raise TransitionError("task is not at an unfinished final verification stage")
+        if state.current_stage is not Stage.BUILD or Stage.BUILD in state.completed_stages:
+            raise TransitionError("task is not at an unfinished Build stage")
         receipt_artifact = self._verify_stage_receipt(state, completion_receipt_ref)
+        self._verify_final_build_evidence(state, receipt_artifact)
         if todo_ref is None:
             raise TransitionError("completed final-stage work list required")
         if state.active_work_artifact_id != todo_ref.artifact_id:
@@ -317,7 +373,7 @@ class HostController:
         self._verify_stage_evidence(receipt_artifact, todo_ref)
         completed = state.model_copy(
             update={
-                "completed_stages": (*state.completed_stages, Stage.BUILD_VALIDATION),
+                "completed_stages": (*state.completed_stages, Stage.BUILD),
                 "active_work_artifact_id": None,
             }
         )
@@ -325,18 +381,139 @@ class HostController:
             self.checkpoint_store.checkpoint_cas(task_id, revision, completed.model_dump(mode="json"))
         except CompetingWriterError as exc:
             raise TransitionError(f"final stage checkpoint CAS failed: {exc}") from exc
-        self.event_store.append(task_id, "stage_completed", Stage.BUILD_VALIDATION.value)
+        self.event_store.append(
+            task_id,
+            "stage_completed",
+            Stage.BUILD.value,
+            event_id=f"stage-completed:{task_id}:{run_id}:{revision + 1}",
+        )
         return completed
 
-    def _declared_dispatch_role(self, stage: Stage) -> str:
+    def route_validation_rework(self, task_id: str, run_id: str, validation_ref: ArtifactRef) -> ArtifactRef:
+        """Return failed verifier observations to a new Planning revision."""
+        from agent.contracts.build_validation import BuildValidationRecord, PlanningReworkInput
+
+        checkpoint = self.checkpoint_store.load_checkpoint(task_id)
+        if checkpoint is None:
+            raise TransitionError("task has no checkpoint for validation rework")
+        revision, state_dict, _ = checkpoint
+        state = TaskState(**state_dict)
+        if (state.task_id, state.run_id) != (task_id, run_id) or state.current_stage is not Stage.BUILD:
+            raise TransitionError("validation rework requires an active Build task")
+        if Stage.BUILD in state.completed_stages:
+            raise TransitionError("completed Build cannot be routed to Planning")
+        if validation_ref.contract_id != "build_validation_record":
+            raise TransitionError("wrong validation record contract")
+        if (
+            state.build_verification_artifact_id != validation_ref.artifact_id
+            or state.build_verification_digest != validation_ref.artifact_digest
+        ):
+            raise TransitionError("validation record was not received from the host-dispatched verifier")
+        if (
+            self.artifact_store.get_digest(validation_ref.artifact_id, validation_ref.artifact_revision)
+            != validation_ref.artifact_digest
+        ):
+            raise TransitionError("validation record digest mismatch")
+        record = BuildValidationRecord.model_validate_json(
+            self.artifact_store.get_verified(validation_ref.artifact_id, validation_ref.artifact_revision)
+        )
+        if (record.task_id, record.run_id) != (task_id, run_id):
+            raise TransitionError("validation record belongs to another task or run")
+        issues = record.planning_issue_inputs()
+        if not issues:
+            raise TransitionError("no failed validation observations for Planning")
+        next_revision = state.planning_revision + 1
+        rework = PlanningReworkInput(
+            task_id=task_id,
+            run_id=run_id,
+            planning_revision=next_revision,
+            validation_ref=validation_ref,
+            issue_sources=issues,
+        )
+        artifact_id = f"planning-rework:{task_id}:{run_id}:{next_revision}"
+        digest = self.artifact_store.put_immutable(rework, artifact_id, 1, "planning_rework_input", "1.0")
+        updated = state.model_copy(
+            update={
+                "current_stage": Stage.PLANNING,
+                "completed_stages": tuple(
+                    stage for stage in state.completed_stages if stage in {Stage.RESEARCH, Stage.AUDIT_DISCOVERY}
+                ),
+                "active_work_artifact_id": None,
+                "build_verification_artifact_id": None,
+                "build_verification_digest": None,
+                "planning_revision": next_revision,
+            }
+        )
+        try:
+            self.checkpoint_store.checkpoint_cas(task_id, revision, updated.model_dump(mode="json"))
+        except CompetingWriterError as exc:
+            raise TransitionError("validation rework checkpoint conflict") from exc
+        self.event_store.append(
+            task_id,
+            "validation_rework_requested",
+            artifact_id,
+            event_id=f"validation-rework:{task_id}:{run_id}:{next_revision}",
+        )
+        return ArtifactRef(
+            artifact_id=artifact_id,
+            artifact_revision=1,
+            artifact_digest=digest,
+            contract_id="planning_rework_input",
+            contract_version="1.0",
+            serializer_profile=SERIALIZER_PROFILE,
+        )
+
+    def _verify_final_build_evidence(self, state: TaskState, artifact: ArtifactRef) -> None:
+        """Require a passing independent verifier record bound to an actual Build record."""
+        from agent.contracts.build import BuildRecord
+        from agent.contracts.build_validation import BuildValidationRecord, CriterionResult
+
+        try:
+            raw = self.artifact_store.get_verified(artifact.artifact_id, artifact.artifact_revision)
+            verification = BuildValidationRecord.model_validate_json(raw)
+            if (verification.task_id, verification.run_id) != (state.task_id, state.run_id):
+                raise ValueError("verification belongs to another task or run")
+            if (
+                state.build_verification_artifact_id != artifact.artifact_id
+                or state.build_verification_digest != artifact.artifact_digest
+            ):
+                raise ValueError("verification was not received from the host-dispatched verifier")
+            if not verification.criterion_results or not verification.e2e_results:
+                raise ValueError("independent verification observations required")
+            if any(item.outcome is not CriterionResult.VALID for item in verification.criterion_results):
+                raise ValueError("acceptance criterion did not pass")
+            if any(
+                item.outcome is not CriterionResult.VALID or item.exit_code != 0 for item in verification.e2e_results
+            ):
+                raise ValueError("end-to-end verification did not pass")
+            build_ref = verification.build_ref
+            if build_ref.contract_id != "build_record":
+                raise ValueError("verification does not cite a Build record")
+            if (
+                self.artifact_store.get_digest(build_ref.artifact_id, build_ref.artifact_revision)
+                != build_ref.artifact_digest
+            ):
+                raise ValueError("Build record digest mismatch")
+            build = BuildRecord.model_validate_json(
+                self.artifact_store.get_verified(build_ref.artifact_id, build_ref.artifact_revision)
+            )
+            if (build.task_id, build.run_id) != (state.task_id, state.run_id):
+                raise ValueError("Build record belongs to another task or run")
+        except Exception as exc:
+            raise TransitionError("final Build requires passing independent verification evidence") from exc
+
+    def _declared_dispatch_role(self, stage: Stage, requested_role: str | None = None) -> str:
         """Resolve the single workflow-owned stage role, rejecting missing configuration."""
         config_path = Path(__file__).resolve().parents[2] / ".agents" / "contracts" / "workflow.yaml"
         try:
             config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
             bundle = config["bundle"]
             declared = config["role_workflows"][stage.value]
-            role = declared["workflow"]["role_id"]
-            stage_id = declared["workflow"]["stage_id"]
+            workflow = declared["workflow"]
+            if stage is Stage.BUILD and requested_role == "build_verifier":
+                workflow = workflow["independent_verification"]["workflow"]
+            role = workflow["role_id"]
+            stage_id = workflow["stage_id"]
         except (OSError, KeyError, TypeError, ValueError, AttributeError) as exc:
             raise TransitionError("registered workflow role unavailable") from exc
         if bundle.get("transition_owner") != "host_controller" or stage_id != stage.value or not isinstance(role, str):
@@ -373,7 +550,7 @@ class HostController:
         if state is None or not information_needed.strip():
             raise TransitionError("dispatch requires an initialized task and nonempty objective")
         stage = state.current_stage
-        role = self._declared_dispatch_role(stage)
+        role = self._declared_dispatch_role(stage, requested_role)
         if requested_role is not None and requested_role != role:
             self.event_store.append(
                 task_id, "agent_dispatch_rejected", f"stage={stage.value};requested={requested_role};allowed={role}"
@@ -399,6 +576,7 @@ class HostController:
         fingerprint = sha256(
             (
                 f"{task_id}:{state.run_id}:{stage.value}:"
+                f"{'build_verifier:' if role == 'build_verifier' else ''}"
                 f"{input_request_ref.artifact_id}:{input_request_ref.artifact_revision}:"
                 f"{input_request_ref.artifact_digest}:{information_needed.strip()}"
             ).encode()
@@ -438,7 +616,12 @@ class HostController:
             action=action or information_needed.strip(),
             expected_result=expected_result or f"Verified {role} output persisted by host",
         )
-        self.event_store.append(task_id, "agent_dispatch_prepared", f"{stage.value}:{role}:{request_id}")
+        self.event_store.append(
+            task_id,
+            "agent_dispatch_prepared",
+            f"{stage.value}:{role}:{request_id}",
+            event_id=f"dispatch:{task_id}:{state.run_id}:{request_id}",
+        )
         return envelope, self._dispatch_ref(envelope, digest), todo_ref
 
     def verify_agent_dispatch(self, envelope: HostDispatchEnvelope) -> None:
@@ -446,7 +629,7 @@ class HostController:
         state = self.get_state(envelope.task_id)
         if state is None or state.run_id != envelope.run_id or state.current_stage.value != envelope.stage:
             raise TransitionError("stale or mismatched agent dispatch stage identity")
-        if self._declared_dispatch_role(state.current_stage) != envelope.role:
+        if self._declared_dispatch_role(state.current_stage, envelope.role) != envelope.role:
             raise TransitionError("agent dispatch targets unauthorized role")
         aid = f"agent-dispatch:{envelope.request_id}"
         try:
@@ -497,9 +680,12 @@ class HostController:
                 Stage.PLANNING: ("planning_record", PlanningRecord),
                 Stage.FIXTURE_VALIDATION: ("fixture_validation_record", FixtureValidationRecord),
                 Stage.BUILD: ("build_record", BuildRecord),
-                Stage.BUILD_VALIDATION: ("build_validation_record", BuildValidationRecord),
             }
-            required_contract, contract_model = contracts[Stage(envelope.stage)]
+            required_contract, contract_model = (
+                ("build_validation_record", BuildValidationRecord)
+                if envelope.stage == Stage.BUILD.value and envelope.role == "build_verifier"
+                else contracts[Stage(envelope.stage)]
+            )
             if output.contract_id != required_contract:
                 raise ValueError("agent result contract belongs to another stage")
             verified_record = contract_model.model_validate_json(raw)
@@ -508,7 +694,7 @@ class HostController:
                 envelope.run_id,
             ):
                 raise ValueError("agent result task/run identity mismatch")
-            if Stage(envelope.stage) is Stage.BUILD:
+            if Stage(envelope.stage) is Stage.BUILD and envelope.role == "builder":
                 from agent.contracts.host import BuildAdmissionReceipt, PackageLockReceipt, admission_receipt_subject
 
                 build = BuildRecord.model_validate(verified_record)
@@ -536,6 +722,7 @@ class HostController:
                     admission.authorized_action_ids,
                     admission.authorized_tool_ids,
                     admission.tool_registry_ref,
+                    admission.recovery_readiness_ref,
                 )
                 if not self.receipt_store.verify(
                     admission.receipt_ref.receipt_id, admission.receipt_ref.receipt_digest, subject
@@ -552,7 +739,30 @@ class HostController:
             )
         except Exception as exc:
             raise TransitionError("agent return is conflicting or unpersisted") from exc
-        self.event_store.append(envelope.task_id, "agent_result_received", f"{envelope.respond_to}:{aid}")
+        self.event_store.append(
+            envelope.task_id,
+            "agent_result_received",
+            f"{envelope.respond_to}:{aid}",
+            event_id=f"agent-result:{envelope.task_id}:{envelope.request_id}:{aid}",
+        )
+        if envelope.stage == Stage.BUILD.value and envelope.role == "build_verifier":
+            checkpoint = self.checkpoint_store.load_checkpoint(envelope.task_id)
+            if checkpoint is None:
+                raise TransitionError("verifier result has no active checkpoint")
+            revision, state_dict, _ = checkpoint
+            state = TaskState(**state_dict)
+            if state.current_stage is not Stage.BUILD or Stage.BUILD in state.completed_stages:
+                raise TransitionError("verifier result arrived outside active Build")
+            updated = state.model_copy(
+                update={
+                    "build_verification_artifact_id": output.artifact_id,
+                    "build_verification_digest": output.artifact_digest,
+                }
+            )
+            try:
+                self.checkpoint_store.checkpoint_cas(envelope.task_id, revision, updated.model_dump(mode="json"))
+            except CompetingWriterError as exc:
+                raise TransitionError(f"verifier result checkpoint conflict: {exc}") from exc
         return ArtifactRef(
             artifact_id=aid,
             artifact_revision=envelope.request_revision,
@@ -592,7 +802,12 @@ class HostController:
                 self.checkpoint_store.checkpoint_cas(binding.task_id, revision, updated.model_dump(mode="json"))
             except CompetingWriterError as exc:
                 raise TransitionError(f"concurrent work assignment: {exc}") from exc
-            self.event_store.append(binding.task_id, "work_assigned", ref.artifact_id)
+            self.event_store.append(
+                binding.task_id,
+                "work_assigned",
+                ref.artifact_id,
+                event_id=f"work-assigned:{binding.task_id}:{ref.artifact_id}:{ref.artifact_revision}",
+            )
         return record, ref
 
     def finish_capability_work(
@@ -621,7 +836,12 @@ class HostController:
             self.checkpoint_store.checkpoint_cas(task_id, revision, updated.model_dump(mode="json"))
         except CompetingWriterError as exc:
             raise TransitionError(f"capability work checkpoint conflict: {exc}") from exc
-        self.event_store.append(task_id, "capability_work_completed", todo_ref.artifact_id)
+        self.event_store.append(
+            task_id,
+            "capability_work_completed",
+            todo_ref.artifact_id,
+            event_id=f"capability-work-completed:{task_id}:{todo_ref.artifact_id}:{todo_ref.artifact_revision}",
+        )
         return updated
 
     def get_state(self, task_id: str) -> TaskState | None:
@@ -636,7 +856,7 @@ class HostController:
         """Initialize a new task."""
         state = TaskState(task_id=task_id, run_id=run_id)
         self.checkpoint_store.checkpoint_cas(task_id, 0, state.model_dump(mode="json"))
-        self.event_store.append(task_id, "task_init", f"run_id={run_id}")
+        self.event_store.append(task_id, "task_init", f"run_id={run_id}", event_id=f"task-init:{task_id}:{run_id}")
         return state
 
     def issue_stage_receipt(

@@ -105,7 +105,7 @@ def cmd_verify(task_id: str, state_root: str = "/tmp/oneshot-state") -> int:
     if state is None:
         print(f"Task {task_id}: not found")
         return 1
-    if state.current_stage == Stage.BUILD_VALIDATION and Stage.BUILD_VALIDATION in state.completed_stages:
+    if state.current_stage == Stage.BUILD and Stage.BUILD in state.completed_stages:
         print(f"Task {task_id}: COMPLETED")
         return 0
     print(f"Task {task_id}: in progress (stage: {state.current_stage})")

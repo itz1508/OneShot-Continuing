@@ -62,6 +62,42 @@ def structural_gap_receipt_subject(result: StructuralGapResult, digest: str) -> 
     )
 
 
+def verify_structural_pass(
+    artifacts: ArtifactStore,
+    receipts: ReceiptStore,
+    task_id: str,
+    run_id: str,
+    result_ref: ArtifactRef,
+    receipt_ref: ReceiptRef,
+    candidate_ref: ArtifactRef | None = None,
+) -> StructuralGapResult:
+    """Recheck the exact structural pass before Scanner, freeze, or transition."""
+    if receipt_ref.issuer_id != "host" or result_ref.contract_id != "structural_analysis_result":
+        raise StructuralGapError("invalid structural gap provenance")
+    raw = artifacts.get_verified(result_ref.artifact_id, result_ref.artifact_revision)
+    if artifacts.get_digest(result_ref.artifact_id, result_ref.artifact_revision) != result_ref.artifact_digest:
+        raise StructuralGapError("structural gap result digest mismatch")
+    result = StructuralGapResult.model_validate_json(raw)
+    if (result.task_id, result.run_id) != (task_id, run_id):
+        raise StructuralGapError("structural gap result belongs to another task or run")
+    if result.execution_status is not StepStatus.COMPLETED or result.findings:
+        raise StructuralGapError("structural gap analysis did not pass")
+    if result.known_critical_gap_detection_rate != 1.0 or not result.walking_skeleton_completed:
+        raise StructuralGapError("structural backtest or walking skeleton incomplete")
+    candidate = result.candidate_specification_ref
+    if candidate_ref is not None and candidate != candidate_ref:
+        raise StructuralGapError("structural pass belongs to another candidate")
+    if artifacts.get_digest(candidate.artifact_id, candidate.artifact_revision) != candidate.artifact_digest:
+        raise StructuralGapError("Planning candidate changed since structural analysis")
+    if not receipts.verify(
+        receipt_ref.receipt_id,
+        receipt_ref.receipt_digest,
+        structural_gap_receipt_subject(result, result_ref.artifact_digest),
+    ):
+        raise StructuralGapError("structural gap completion receipt is not verified")
+    return result
+
+
 class HostGapAnalyzer:
     """Verify and persist canonical Gap Analysis without owning its decisions."""
 
