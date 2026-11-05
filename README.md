@@ -15,14 +15,14 @@ OneShot separates AI research and planning from execution authority. It records 
 
 **Entry operation:** User Intent → Auto-generated Summary is only an automatic, concise restatement of the request. It is not requirement analysis, Planning, approval, or execution.
 
-**The two Audit Discovery boxes are two responsibilities of the SAME role, not two agents.** First, Audit Discovery prepares the targeted Research request and continuous fixture guidance; after Research, it performs read-only codebase discovery. Catalog is supporting context, not a stage. Dashed arrows depict context and revision/follow-up routes.
+**The two Audit Discovery boxes are two responsibilities of the SAME role, not two agents.** First, Audit Discovery prepares the targeted Research request and continuous fixture guidance; after Research, it performs read-only codebase discovery. Catalog provides illustrative **success-case or baseline templates**, not verified completed runs or measured baselines; it is not a workflow stage. Dashed arrows depict context and revision/follow-up routes.
 
 ```mermaid
 flowchart TD
     INPUT["User Intent"] e01@--> INTENT["Auto-generated Summary<br/>Concise restatement only"]
     INTENT e02@--> SEARCH["Search Context<br/>Scope · sources · questions"]
     INTENT e03@--> REQUEST["Audit Discovery · prepare request<br/>Research questions · expected evidence<br/>Initial fixture guidance"]
-    INTENT e04@-.-> CATALOG[("Catalog<br/>Reusable checklists · context")]
+    INTENT e04@-.-> CATALOG[("Catalog<br/>Success-case templates · baseline examples")]
     CATALOG e05@-.-> REQUEST
     CATALOG e06@-.-> RESEARCH
     SEARCH e07@--> RESEARCH["Researcher<br/>Generate Research To-Do · gather sources<br/>Investigate requirements · dependencies · fixtures"]
@@ -78,7 +78,7 @@ flowchart TD
 | Step and owner | Required actions | Exact handoff |
 | --- | --- | --- |
 | **1. User Intent / Auto-generated Summary** | Automatically summarize the user request in plain language. Do not infer requirements, add scope, decide implementation, or perform analysis at this step. | Summary → Search Context and Audit Discovery request preparation. |
-| **2. Catalog bootstrap** | Match registered reusable checklists, applicable examples, and verified context; preserve source, version, and provenance. Synthetic material is guidance, not factual authority. | Context guidance → initial Audit Discovery and Research. No extra role stage. |
+| **2. Catalog — success-case / baseline templates** | Select relevant example templates for what a successful case or baseline should look like. Preserve template identity, version, and its stated success criteria or fixture blueprint where provided. Existing catalog samples are synthetic examples, **not** evidence of a completed success or a measured baseline. | Example template → Audit Discovery request preparation and Research. No extra role stage. |
 | **3. Audit Discovery: initial request** | Determine what must be learned for successful discovery; define targeted research questions, required sources/evidence, unknown technical constraints, and **fixture guidance**: requirement, purpose, preconditions, triggering action, expected behavior, failure observations, required evidence, false-positive protection, setup limitations. | Research request **carrying fixture guidance** → Researcher. Guidance is created here, not executed. |
 | **4. Researcher** | Read exact request, generate Research To-Do, inspect permitted sources/APIs/standards, gather requirements/dependency/fixture-related evidence, cross-check claims, preserve contradictions and unknowns, bind sources to the originating request. | Evidence-grounded Research response → Audit Discovery. |
 | **5. Audit Discovery: repository inspection** | Load Research, guidance, repo instructions and source checkpoint; inspect real files, entrypoints, interfaces, schemas, dependencies, tests, dispatch, producers/consumers, ownership and paths; assess requirements, identify gaps, prepare CodeIntent, refine fixture guidance, verify source stability. Request targeted Research follow-up if needed. **Read-only; no design decisions.** | Findings + source evidence + CodeIntent + refined guidance → Planning. |
