@@ -8,87 +8,46 @@ OneShot separates AI research and planning from execution authority. It records 
 [![MVP integration](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml)
 [![Research and Audit](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml)
 
-## Six-stage workflow and its gates
+## OneShot workflow — animated overview
 
-The user defines the outcome; Research records **what success looks like**, Audit Discovery inspects the repository, and Planning specifies the change. The host must admit Build before dispatching work to **Modal Sandbox**. Moving arrows illustrate the designed lifecycle; the complete workflow is **not yet connected through the MVP**.
+The diagram shows the **intended user-facing workflow**, not a recording of live execution. User intent is available to both Catalog and Research. Catalog supplies reusable context; Audit Discovery can request further Research. Planning owns code review, refactor design, gap analysis, and specification. Fixture Validation precedes authorized Build, followed by independent E2E verification.
 
 ```mermaid
-flowchart TD
-    ASK["User asks"] e01@--> R["1 · Research"]
-    R e02@--> SUCCESS["What success looks like<br/>Accepted outcome + success criteria"]
-    SUCCESS e03@--> AUDIT["2 · Audit Discovery"]
-    AUDIT e04@--> PLAN["3 · Planning"]
-    PLAN e05@--> CHECK{"Host gap analysis + Scanner"}
-    CHECK -->|Correction required| PLAN
-    CHECK e06@-->|Pass: freeze plan| FIXTURE{"4 · Fixture Validation"}
-    FIXTURE -->|Fail| BLOCK["Blocked"]
-    FIXTURE e07@-->|Pass| ADMIT{"Package lock + Build Admission"}
-    ADMIT -->|Denied| BLOCK
+flowchart LR
+    INTENT["User Intent"] e01@--> RESEARCH["Research"]
+    INTENT e02@-.-> CATALOG[("Catalog")]
+    CATALOG e03@-.-> RESEARCH
+    RESEARCH e04@-.-> CATALOG
 
-    subgraph MODAL["Modal Sandbox product · standalone v3 adapter; host integration pending"]
-        PREFLIGHT["Host preflight + durable checkpoint"]
-        SANDBOX["Modal Sandbox.create<br/>Pinned image · network blocked"]
-        TRANSFER["Modal Sandbox filesystem<br/>Upload source.tar + bundle.zip"]
-        BUILD["5 · Build · sandbox.exec<br/>Apply patch + run admitted checks"]
-        RETURN["Modal Sandbox export<br/>result.json · after.tar · evidence.zip"]
-        PREFLIGHT e09@--> SANDBOX
-        SANDBOX e10@--> TRANSFER
-        TRANSFER e11@--> BUILD
-        BUILD e12@--> RETURN
-    end
-
-    ADMIT e08@-->|Accepted| PREFLIGHT
-    RETURN e13@-->|Download results; terminate Sandbox| RECON["Host checks exported changes + effects"]
-    RECON e14@--> VERIFY{"6 · Independent Build Validation"}
-    VERIFY -->|Fail| BLOCK
-    VERIFY e15@-->|Pass| DONE["Build done<br/>Trusted host completion receipt"]
-
-    BLOCK e16@--> ISOLATE["Isolate affected work<br/>Keep checkpoint and evidence"]
-    ISOLATE e17@--> ERROR["Host recovery classification<br/>Reconcile uncertain effects"]
-    ERROR e18@-->|Safe bounded retry| RESUME["Resume interrupted role<br/>Existing provider / model binding"]
-    ERROR -->|Plan change required| PLAN
-    ERROR -->|Unresolved diagnostics| HELP["Call for Help · hook (proposed)<br/>Not a stage or model switch"]
-    HELP e19@--> CONTEXT["Bind same task, role and model<br/>Redacted, scoped error evidence"]
-    CONTEXT e20@--> ADVICE["Active model continues<br/>Diagnostic advice only"]
-    ADVICE e21@--> REVIEW["Host reviews advice and evidence<br/>No implicit execution authority"]
-    REVIEW e22@-->|Within admitted scope + safe retry| RESUME
-    REVIEW -->|Scope or Plan change| PLAN
-    REVIEW -->|Unresolved| HOLD["Remain isolated<br/>Operator intervention"]
+    RESEARCH e05@--> AUDIT["Audit Discovery"]
+    AUDIT e06@-.->|More evidence| RESEARCH
+    AUDIT e07@--> PLAN["Planning<br/>Code review · Refactor design<br/>Gap analysis · Build specification"]
+    PLAN e08@--> FIXTURE["Fixture Validation"]
+    FIXTURE e09@-->|Admitted work| BUILD["Build"]
+    BUILD e10@--> VERIFY["E2E Verification"]
 
     e01@{ animation: fast }
-    e02@{ animation: fast }
-    e03@{ animation: fast }
-    e04@{ animation: fast }
+    e02@{ animation: slow }
+    e03@{ animation: slow }
+    e04@{ animation: slow }
     e05@{ animation: fast }
-    e06@{ animation: fast }
+    e06@{ animation: slow }
     e07@{ animation: fast }
     e08@{ animation: fast }
     e09@{ animation: fast }
     e10@{ animation: fast }
-    e11@{ animation: fast }
-    e12@{ animation: fast }
-    e13@{ animation: fast }
-    e14@{ animation: fast }
-    e15@{ animation: slow }
-    e16@{ animation: fast }
-    e17@{ animation: fast }
-    e18@{ animation: fast }
-    e19@{ animation: fast }
-    e20@{ animation: fast }
-    e21@{ animation: fast }
-    e22@{ animation: fast }
 
-    classDef gate fill:#473515,stroke:#efbf6d,color:#fff,stroke-width:2px;
-    classDef blocked fill:#53272a,stroke:#ff9999,color:#fff,stroke-width:2px;
-    classDef sandbox fill:#173e43,stroke:#5ad5c5,color:#fff,stroke-width:2px;
-    classDef info fill:#17384a,stroke:#6ac8ec,color:#fff,stroke-width:2px;
-    classDef success fill:#123f32,stroke:#75daa8,color:#fff,stroke-width:2px;
-    class CHECK,FIXTURE,ADMIT,VERIFY gate;
-    class BLOCK,ISOLATE,ERROR,HELP,HOLD blocked;
-    class SANDBOX,TRANSFER,BUILD,RETURN sandbox;
-    class CONTEXT,ADVICE,RESUME info;
-    class SUCCESS,DONE success;
+    classDef intent fill:#163c4a,stroke:#29c8d5,color:#ffffff,stroke-width:2px;
+    classDef role fill:#15334b,stroke:#69b9ef,color:#ffffff,stroke-width:2px;
+    classDef supporting fill:#243547,stroke:#8fa1bd,color:#ffffff,stroke-width:1px;
+    classDef execution fill:#163f39,stroke:#60d8b8,color:#ffffff,stroke-width:2px;
+    class INTENT intent;
+    class RESEARCH,AUDIT,PLAN,FIXTURE role;
+    class CATALOG supporting;
+    class BUILD,VERIFY execution;
 ```
+
+**Presentation boundary:** Runtime routing, persistence, authorization, and recovery are infrastructure responsibilities, not an additional agent or workflow stage. Animated arrows illustrate handoffs; they are not evidence of connected backend execution. GitHub renders this directly from Markdown; the interactive System Chat remains in [`web/`](web/).
 
 
 **Recovery lifecycle:** A failed task or wave is isolated and its effects are reconciled by the host. **Call for Help is a proposed diagnostic hook within the interrupted role, not a workflow stage, alternative agent, or model selector.** It retains the task/role and resolved provider/model binding. The host supplies only authorized, redacted evidence. Advice has no execution authority: a within-scope continuation still requires host checks, and a scope/Plan change returns to Planning and repeats validation. The current repository implements bounded recovery classification but **does not implement a connected Call for Help hook**. The diagram is the intended contract, not evidence of a working help invocation.
