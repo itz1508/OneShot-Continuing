@@ -13,11 +13,13 @@ OneShot separates AI research and planning from execution authority. It records 
 
 > **Documentation-only clarification (2026-11-05):** This README edit explains the **intended workflow and user intent more clearly**. **No technical implementation, application code, workflow contracts, tests, API, configuration, runtime behavior, or execution authorization was changed.** The current source may still contain legacy Fixture Validation, Package Lock, Build Admission, and Task Integration contracts. This diagram does not claim they have been changed or removed.
 
+**Entry operation:** User Intent → Auto-generated Summary is only an automatic, concise restatement of the request. It is not requirement analysis, Planning, approval, or execution.
+
 **The two Audit Discovery boxes are two responsibilities of the SAME role, not two agents.** First, Audit Discovery prepares the targeted Research request and continuous fixture guidance; after Research, it performs read-only codebase discovery. Catalog is supporting context, not a stage. Dashed arrows depict context and revision/follow-up routes.
 
 ```mermaid
 flowchart TD
-    INPUT["User Input"] e01@--> INTENT["Intent Summary<br/>Accepted outcome · constraints · requirements"]
+    INPUT["User Intent"] e01@--> INTENT["Auto-generated Summary<br/>Concise restatement only"]
     INTENT e02@--> SEARCH["Search Context<br/>Scope · sources · questions"]
     INTENT e03@--> REQUEST["Audit Discovery · prepare request<br/>Research questions · expected evidence<br/>Initial fixture guidance"]
     INTENT e04@-.-> CATALOG[("Catalog<br/>Reusable checklists · context")]
@@ -75,7 +77,7 @@ flowchart TD
 
 | Step and owner | Required actions | Exact handoff |
 | --- | --- | --- |
-| **1. Input / Intent Summary** | Preserve the original request, attachments, accepted requirements, constraints, expected outcome, project/source, and task/request revisions. Prepare Search Context without adding unaccepted requirements. | Intent and Search Context → Audit Discovery request preparation and Research. |
+| **1. User Intent / Auto-generated Summary** | Automatically summarize the user request in plain language. Do not infer requirements, add scope, decide implementation, or perform analysis at this step. | Summary → Search Context and Audit Discovery request preparation. |
 | **2. Catalog bootstrap** | Match registered reusable checklists, applicable examples, and verified context; preserve source, version, and provenance. Synthetic material is guidance, not factual authority. | Context guidance → initial Audit Discovery and Research. No extra role stage. |
 | **3. Audit Discovery: initial request** | Determine what must be learned for successful discovery; define targeted research questions, required sources/evidence, unknown technical constraints, and **fixture guidance**: requirement, purpose, preconditions, triggering action, expected behavior, failure observations, required evidence, false-positive protection, setup limitations. | Research request **carrying fixture guidance** → Researcher. Guidance is created here, not executed. |
 | **4. Researcher** | Read exact request, generate Research To-Do, inspect permitted sources/APIs/standards, gather requirements/dependency/fixture-related evidence, cross-check claims, preserve contradictions and unknowns, bind sources to the originating request. | Evidence-grounded Research response → Audit Discovery. |
