@@ -9,103 +9,88 @@ OneShot separates AI research and planning from execution authority. It records 
 [![Research and Audit](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml)
 
 
-## Intended end-to-end workflow — detailed overview
+## Intended end-to-end workflow
 
-> **Documentation-only clarification (2026-11-05):** This README edit explains the **intended workflow and user intent more clearly**. **No technical implementation, application code, workflow contracts, tests, API, configuration, runtime behavior, or execution authorization was changed.** The current source may still contain legacy Fixture Validation, Package Lock, Build Admission, and Task Integration contracts. This diagram does not claim they have been changed or removed.
+> **Documentation status (2026-11-05):** This diagram describes the intended workflow, not confirmed runtime behavior. It does not alter application code, workflow contracts, authorization, or tests.
 
-**Entry operation:** User Intent → Auto-generated Summary is only an automatic, concise restatement of the request. It is not requirement analysis, Planning, approval, or execution.
+![Evidence-driven build workflow](docs/workflow.gif)
 
-**The two Audit Discovery boxes are two responsibilities of the SAME role, not two agents.** First, Audit Discovery prepares the targeted Research request and continuous fixture guidance; after Research, it performs read-only codebase discovery. Catalog provides illustrative **success-case or baseline templates**, not verified completed runs or measured baselines; it is not a workflow stage. Dashed arrows depict context and revision/follow-up routes.
+The central vertical path shows the ordered workflow. Catalog guidance and correction routes branch horizontally. **The host controls routing, state, approval enforcement, execution authorization, and evidence retention.** The animation is an architectural explanation, not a recording of a successful run.
 
-```mermaid
-flowchart TD
-    INPUT["User Intent"] e01@--> INTENT["Auto-generated Summary<br/>Concise restatement only"]
-    INTENT e02@--> SEARCH["Search Context<br/>Scope · sources · questions"]
-    INTENT e03@--> REQUEST["Audit Discovery · prepare request<br/>Research questions · expected evidence<br/>Initial fixture guidance"]
-    INTENT e04@-.-> CATALOG[("Catalog<br/>Success-case templates · baseline examples")]
-    CATALOG e05@-.-> REQUEST
-    CATALOG e06@-.-> RESEARCH
-    SEARCH e07@--> RESEARCH["Researcher<br/>Generate Research To-Do · gather sources<br/>Investigate requirements · dependencies · fixtures"]
-    REQUEST e08@-->|Targeted request + fixture guidance| RESEARCH
-    RESEARCH e09@--> AUDIT["Audit Discovery · inspect repository<br/>Read-only source audit · trace paths and ownership<br/>Assess requirements · gaps · CodeIntent"]
-    AUDIT e10@-.->|More evidence| RESEARCH
-    AUDIT e11@--> PLAN["Planning<br/>Code review · design · refactor · gap analysis<br/>Scanner observations · exact file actions<br/>Dependencies · fixture-based verification"]
-    PLAN e12@--> REVIEW["User Review Hook<br/>Review · Edit · Approve exact plan revision"]
-    REVIEW e13@-.->|Edit or revise| PLAN
-    REVIEW e14@-->|Approved plan checkpoint| BUILDER["Builder<br/>Generate and track Build Task To-Do<br/>Prepare authorized implementation candidate"]
-    BUILDER e15@--> PRE["Build Preflight<br/>Check approval · paths · dependencies · preimages<br/>Tools · candidate integrity · Sandbox profile"]
-    PRE e16@-->|Start Sandbox for attempt| MODAL["Modal Build Sandbox<br/>Transfer source + candidate · apply changes<br/>Execute registered checks · record effects<br/>Export results/evidence · terminate"]
-    MODAL e17@--> E2E["Independent E2E Verification<br/>Run real entrypoints · integration · regression<br/>Observe user outcome against fixture guidance"]
-    E2E e18@-.->|Same approved scope| BUILDER
-    E2E e19@-.->|Design or scope revision| PLAN
-    E2E e20@--> DONE["Completion<br/>Verified evidence · source and checkpoint<br/>Cleanup · verified reusable memory"]
+### Overview
 
-    e01@{ animation: fast }
-    e02@{ animation: fast }
-    e03@{ animation: fast }
-    e07@{ animation: fast }
-    e08@{ animation: fast }
-    e09@{ animation: fast }
-    e11@{ animation: fast }
-    e12@{ animation: fast }
-    e14@{ animation: fast }
-    e15@{ animation: fast }
-    e16@{ animation: fast }
-    e17@{ animation: fast }
-    e20@{ animation: fast }
-    e04@{ animation: slow }
-    e05@{ animation: slow }
-    e06@{ animation: slow }
-    e10@{ animation: slow }
-    e13@{ animation: slow }
-    e18@{ animation: slow }
-    e19@{ animation: slow }
+**User Request → Automatic Summary → Discovery Request → Research → Repository Audit → Planning → User Review → Builder → Preflight → Sandbox Execution → Independent Validation → Completion.**
 
-    classDef intent fill:#163c4a,stroke:#29c8d5,color:#ffffff,stroke-width:2px;
-    classDef role fill:#15334b,stroke:#69b9ef,color:#ffffff,stroke-width:2px;
-    classDef supporting fill:#243547,stroke:#8fa1bd,color:#ffffff,stroke-width:1px;
-    classDef execution fill:#163f39,stroke:#60d8b8,color:#ffffff,stroke-width:2px;
-    classDef review fill:#3a3524,stroke:#ffc46b,color:#ffffff,stroke-width:2px;
-    class INPUT,INTENT intent;
-    class SEARCH,CATALOG supporting;
-    class REQUEST,RESEARCH,AUDIT,PLAN,BUILDER role;
-    class REVIEW review;
-    class PRE,MODAL,E2E,DONE execution;
-```
+Catalog supplies versioned example templates to **both** Discovery request preparation and Research. Templates illustrate expected behavior; they are not proof of a successful implementation or measured baselines.
 
-### Complete responsibility, operation, and handoff sequence
+### Core rules
 
-| Step and owner | Required actions | Exact handoff |
+- The automatic summary preserves user intent without adding requirements or selecting implementation details.
+- Discovery request preparation defines research questions, required evidence, constraints, and fixture guidance.
+- Research returns evidence with provenance, contradictions, and unresolved questions. Repository Audit inspects that evidence against actual source.
+- Repository Audit is read-only; Planning owns architecture, design, refactoring decisions, and exact file actions.
+- User approval binds to **one plan revision and source checkpoint**. Changes to the plan require renewed approval.
+- Builder operates only within the approved scope. **Preflight must complete before** any Sandbox execution; unresolved prerequisites block execution.
+- One disposable Modal Sandbox is used per execution attempt. Its results are evidence inputs, not self-certified completion.
+- Independent Validation observes actual behavior against accepted requirements, including integration, regression, and recovery checks where applicable.
+- Completion requires reconciled attempts, trusted verification evidence, the recorded source checkpoint, cleanup, and retained artifacts.
+
+### Workflow stages and handoffs
+
+| Stage | Responsibility | Handoff |
 | --- | --- | --- |
-| **1. User Intent / Auto-generated Summary** | Automatically summarize the user request in plain language. Do not infer requirements, add scope, decide implementation, or perform analysis at this step. | Summary → Search Context and Audit Discovery request preparation. |
-| **2. Catalog — success-case / baseline templates** | Select relevant example templates for what a successful case or baseline should look like. Preserve template identity, version, and its stated success criteria or fixture blueprint where provided. Existing catalog samples are synthetic examples, **not** evidence of a completed success or a measured baseline. | Example template → Audit Discovery request preparation and Research. No extra role stage. |
-| **3. Audit Discovery: initial request** | Determine what must be learned for successful discovery; define targeted research questions, required sources/evidence, unknown technical constraints, and **fixture guidance**: requirement, purpose, preconditions, triggering action, expected behavior, failure observations, required evidence, false-positive protection, setup limitations. | Research request **carrying fixture guidance** → Researcher. Guidance is created here, not executed. |
-| **4. Researcher** | Read exact request, generate Research To-Do, inspect permitted sources/APIs/standards, gather requirements/dependency/fixture-related evidence, cross-check claims, preserve contradictions and unknowns, bind sources to the originating request. | Evidence-grounded Research response → Audit Discovery. |
-| **5. Audit Discovery: repository inspection** | Load Research, guidance, repo instructions and source checkpoint; inspect real files, entrypoints, interfaces, schemas, dependencies, tests, dispatch, producers/consumers, ownership and paths; assess requirements, identify gaps, prepare CodeIntent, refine fixture guidance, verify source stability. Request targeted Research follow-up if needed. **Read-only; no design decisions.** | Findings + source evidence + CodeIntent + refined guidance → Planning. |
-| **6. Planning** | Review code/evidence and CodeIntent; select design and refactors; perform structural gap analysis and reconcile Scanner observations; resolve paths, interfaces, dependencies, and contract gaps; specify exact create/modify/move/delete actions, expected behavior, commands, recovery and fixture-based acceptance checks. | Complete versioned Build plan and affected-file details → User Review Hook. |
-| **7. User Review Hook** | Present requirements, plan, file actions, dependencies, and verification. Provide **Review / Edit / Approve**. Revision returns to Planning; approval binds to the exact plan revision and checkpoint. | Approved plan → Builder. No additional Package Lock or Build Admission stage in this intended workflow. |
-| **8. Builder** | Load approved plan; **generate and track Build Task To-Do** (individual simple tasks or dependency-ordered complex work), inspect relevant source, prepare implementation changes only within approved paths, associate candidate/attempt with required checks and fixture guidance. | Authorized candidate + task identity → Build Preflight. |
-| **9. Build Preflight** | Verify user approval, plan revision, source snapshot and preimages, permitted paths, task dependencies, tools/commands, candidate integrity, Sandbox profile/image/resources and attempt identity. **Start the Sandbox** after prerequisites. | Preflighted attempt → one Modal Build Sandbox. |
-| **10. Modal Build Sandbox** | Provision one disposable Sandbox per Build attempt; transfer pinned source, candidate and trusted runner; prepare isolated filesystem; apply authorized changes; run specified baseline/focused/broader checks; record changed paths, command results, tree digests and effects; export artifacts; terminate. | result.json + after.tar + evidence.zip + attempt state → independent E2E. No separate Task Integration stage in the intended workflow. |
-| **11. Independent E2E Verification** | Inspect resulting source and Build To-Do; execute real application entrypoints, integration, regression and required edge cases; compare observed behavior to accepted user requirements and carried fixture guidance; retain evidence. Correct same-scope work via Builder and Preflight; changed scope goes via Planning and user review. | Evidence-backed observed user outcome → Completion. |
-| **12. Completion / retention** | Preserve source identity, completed task evidence, independent verification results and final checkpoint; reconcile outstanding attempts; clean temporary work and Sandboxes; retain trusted artifacts and promote only verified reusable knowledge. | Completion record and eligible memory. |
+| Automatic Summary | Restate the request faithfully, without requirement analysis | Request summary to Catalog and Discovery |
+| Catalog Selection | Select applicable versioned success-case or baseline examples | Template references to Discovery **and** Research |
+| Discovery Request Preparation | Formulate targeted research questions and initial fixture guidance | Research request and guidance |
+| Research | Gather evidence, track sources, contradictions, and unknowns | Evidence-grounded research response to Audit |
+| Repository Audit | Read repository files, contracts, dependencies, paths, tests, and ownership; refine fixture guidance | Read-only findings and CodeIntent to Planning |
+| Planning | Review evidence, resolve design and gaps, specify file actions, dependencies, checks, and acceptance criteria | Versioned plan for user review |
+| User Review & Approval | Review or edit the plan; approve the exact revision and source checkpoint | Approval record bound to that revision/checkpoint |
+| Builder | Create and track Build Task To-Do; prepare authorized changes only | Candidate and task metadata to Preflight |
+| Build Preflight | Check approval, source preimages, paths, dependencies, commands, tools, and Sandbox profile | Authorized execution attempt or recorded blocker |
+| Sandbox Execution | Apply the candidate in an isolated environment, run registered checks, record effects, and export evidence | Execution artifacts and attempt state |
+| Independent Validation | Run real entrypoints and required integration, regression, and edge-case checks against accepted criteria | Evidence-backed verification results |
+| Completion & Retention | Reconcile attempts, preserve final source identity, clean up temporary resources, and retain trusted evidence | Completion record and eligible reusable knowledge |
 
-### Fixture guidance persists through every responsibility
+**Discovery responsibility:** Request preparation and repository inspection are two operations of the *same Audit Discovery role*, separated by Research, not two independent agents. Fixture guidance follows the task from request preparation through independent validation; guidance itself is not a completed test.
 
-**Audit Discovery request → Research evidence → Audit Discovery repository inspection → Planning verification design → User-reviewed plan → Builder To-Do → Build Preflight → Modal Sandbox checks → independent E2E observations.**
+### Artifact contracts
 
-Each handoff preserves its fixture ID, originating requirement, guidance revision, expected observation, and evidence references. Research investigates the guidance, Audit Discovery refines it against actual code, Planning binds it to concrete actions and acceptance criteria, Builder carries it with tasks, Sandbox executes applicable checks, and E2E independently observes product behavior. Guidance is **not** a standalone Fixture Validation stage, a second Sandbox, or proof that tests have run.
+Every handoff must identify its **producer, consumer, schema version, originating request, and applicable source or plan revision**. A contract defines required fields, source/evidence references, preconditions, status semantics, consumer expectations, and retention.
 
-### Checkpoints, corrections, and boundaries
+Do not create multiple output files for one logical result unless they have different schemas and responsibilities. Canonical artifact names beyond the Sandbox exports must be confirmed against registered contracts before being described as implemented.
 
-- **User approval checkpoint:** Exact plan revision, approved path scope, requirements, guidance, and decision. An edited plan requires renewed review; a completed To-Do does not authorize new scope.
-- **Research follow-ups:** Audit Discovery can ask for missing evidence and resume its existing work context. Do not add another agent or restart the full workflow.
-- **Build correction:** A correction inside approved scope returns to Builder → Preflight → a **new disposable Sandbox attempt**. A change to architecture, files, dependencies or requirements returns to Planning → User Review.
-- **Evidence and recovery:** Preserve command output, attempted effects, revisions, source digests, evidence references and checkpoints. Reconcile uncertain effects before continuation. Sandbox output alone is not a verified user outcome.
-- **Supporting services:** Catalog, tool/provider registries, artifact/event stores, checkpoints, work tracking, receipts and memory support the sequence, but are not separate user-facing stages.
-- **Evidence boundary:** Animated edges show the intended narrative, **not observed runtime execution**. Source contracts, runtime implementation, and real connected E2E results must be verified separately. This README edit does not modify any of them.
+**Sandbox attempt exports:**
 
-[Existing workflow contract](.agents/contracts/workflow.yaml) · [Role instructions](.agents/reference/) · [Standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md)
+- `result.json` — structured command and execution results
+- `after.tar` — resulting source tree
+- `evidence.zip` — recorded execution evidence
+- **Attempt state** — lifecycle, interruption/recovery, and reconciliation status
+
+These exports support independent verification; they do not replace it.
+
+### Approval and correction paths
+
+| Condition | Required route |
+| --- | --- |
+| Audit needs additional evidence | Audit → targeted Research follow-up → Audit |
+| User requests a plan change | User Review → Planning → User Review |
+| Plan revision or source checkpoint changes | Reconcile the change and obtain fresh review/approval before implementation |
+| Preflight prerequisites are unresolved | Resolve prerequisites → rerun Preflight; **do not start Sandbox** |
+| Validation identifies a defect within approved scope | Builder → Preflight → new Sandbox attempt → Independent Validation |
+| Validation requires new design, files, dependencies, or requirements | Planning → User Review → Builder → Preflight → Sandbox → Independent Validation |
+| Execution is interrupted or effects are uncertain | Preserve attempt evidence, reconcile side effects, and establish safe retry disposition before continuing |
+
+### Completion criteria
+
+Completion requires evidence-backed verification of accepted user outcomes; an accounted-for Build Task To-Do and required checks; recorded source identity and final checkpoint; reconciled attempts; cleaned temporary work and Sandboxes; retained trusted artifacts; and promotion of reusable knowledge **only from verified results**.
+
+### Implementation status and authority
+
+**Intended design, not verified implementation.** The current [workflow contract](.agents/contracts/workflow.yaml) still declares legacy Fixture Validation, Package Lock, Build Admission, Task Integration, and Build Validation operations. Their presence in the source is not evidence that they were removed or replaced. The GIF and README do not establish connected end-to-end execution.
+
+[Role instructions](.agents/reference/) · [Standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md)
+
 
 ## Model metadata, Help hook, and Modal product boundaries
 
