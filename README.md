@@ -43,19 +43,17 @@ flowchart TD
     VERIFY -->|Fail| BLOCK
     VERIFY e15@-->|Pass| DONE["Build done<br/>Trusted host completion receipt"]
 
-    BLOCK e16@--> ISOLATE["Isolate affected work<br/>Preserve checkpoints + evidence"]
-    ISOLATE e17@--> ERROR["Error Handling<br/>Diagnose + reconcile"]
-    ISOLATE e18@--> HELP["Call for Help<br/>Host-approved diagnostic request"]
-    ERROR e19@-->|Documented correction| PLAN
-    ERROR -->|Cannot resolve| HELP
-
-    HELP e20@--> SELECT{"Select Help inference service"}
-    SELECT e21@-->|Configured Meta adapter| META["Meta Model API<br/>Muse Spark 1.3"]
-    SELECT e22@-->|Proposed Baseten route| BASE["Baseten Model APIs<br/>Muse Spark Open"]
-    META e23@-->|Candidate diagnosis| REVIEW["Review model advice<br/>Evidence + provenance"]
-    BASE e24@-->|Candidate diagnosis| REVIEW
-    REVIEW e25@-->|Approved resolution| PLAN
-    REVIEW -->|Unresolved| HOLD["Stay isolated<br/>Call operator for help"]
+    BLOCK e16@--> ISOLATE["Isolate affected work<br/>Keep checkpoint and evidence"]
+    ISOLATE e17@--> ERROR["Host recovery classification<br/>Reconcile uncertain effects"]
+    ERROR e18@-->|Safe bounded retry| RESUME["Resume interrupted role<br/>Existing provider / model binding"]
+    ERROR -->|Plan change required| PLAN
+    ERROR -->|Unresolved diagnostics| HELP["Call for Help · hook (proposed)<br/>Not a stage or model switch"]
+    HELP e19@--> CONTEXT["Bind same task, role and model<br/>Redacted, scoped error evidence"]
+    CONTEXT e20@--> ADVICE["Active model continues<br/>Diagnostic advice only"]
+    ADVICE e21@--> REVIEW["Host reviews advice and evidence<br/>No implicit execution authority"]
+    REVIEW e22@-->|Within admitted scope + safe retry| RESUME
+    REVIEW -->|Scope or Plan change| PLAN
+    REVIEW -->|Unresolved| HOLD["Remain isolated<br/>Operator intervention"]
 
     e01@{ animation: fast }
     e02@{ animation: fast }
@@ -79,53 +77,48 @@ flowchart TD
     e20@{ animation: fast }
     e21@{ animation: fast }
     e22@{ animation: fast }
-    e23@{ animation: fast }
-    e24@{ animation: fast }
-    e25@{ animation: fast }
 
     classDef gate fill:#473515,stroke:#efbf6d,color:#fff,stroke-width:2px;
     classDef blocked fill:#53272a,stroke:#ff9999,color:#fff,stroke-width:2px;
     classDef sandbox fill:#173e43,stroke:#5ad5c5,color:#fff,stroke-width:2px;
-    classDef model fill:#073b44,stroke:#4ed3c0,color:#fff,stroke-width:2px;
+    classDef info fill:#17384a,stroke:#6ac8ec,color:#fff,stroke-width:2px;
     classDef success fill:#123f32,stroke:#75daa8,color:#fff,stroke-width:2px;
-    class CHECK,FIXTURE,ADMIT,VERIFY,SELECT gate;
+    class CHECK,FIXTURE,ADMIT,VERIFY gate;
     class BLOCK,ISOLATE,ERROR,HELP,HOLD blocked;
     class SANDBOX,TRANSFER,BUILD,RETURN sandbox;
-    class META,BASE model;
+    class CONTEXT,ADVICE,RESUME info;
     class SUCCESS,DONE success;
 ```
 
 
-**Recovery lifecycle:** A failed task or wave is isolated. The host prepares a scoped diagnostic request, then may invoke **Meta Model API** or the proposed **Baseten Model APIs** route. Model responses are **advice, not authority**. A reviewed resolution returns to **Planning**, where a new revision repeats gap checks, fixture validation, and Build Admission. Unresolved work remains isolated.
+**Recovery lifecycle:** A failed task or wave is isolated and its effects are reconciled by the host. **Call for Help is a proposed diagnostic hook within the interrupted role, not a workflow stage, alternative agent, or model selector.** It retains the task/role and resolved provider/model binding. The host supplies only authorized, redacted evidence. Advice has no execution authority: a within-scope continuation still requires host checks, and a scope/Plan change returns to Planning and repeats validation. The current repository implements bounded recovery classification but **does not implement a connected Call for Help hook**. The diagram is the intended contract, not evidence of a working help invocation.
 
 **Sandbox return lifecycle:** The standalone Modal adapter can create a disposable network-blocked Sandbox, transfer the pinned source and candidate patch, execute permitted commands, export result files, and terminate the Sandbox. OneShot host integration, independent E2E, and trusted completion receipts remain separate unfinished requirements.
 
 [Workflow contract](.agents/contracts/workflow.yaml) · [Host controller](agent/runtime/controller.py) · [Modal Sandbox v3 source](deployment/modal/sandbox_v3/src/modal_build_sandbox/modal_runtime.py)
 
-## Meta Muse Spark + Baseten inference + Modal products
+## Model metadata, Help hook, and Modal product boundaries
 
-These are **three different product responsibilities**: model inference, optional model-serving infrastructure, and isolated Build execution. Model inference is not performed inside the network-blocked Build Sandbox.
+The model name and API endpoint are **informational runtime/configuration metadata, not interactive workflow choices**. An individual Build or Call for Help must never silently switch to another model. Model provider setup is a separate operator configuration surface, not a decision inside a task.
 
 ```mermaid
 flowchart LR
     UI["OneShot System Chat"] a01@--> HOST["OneShot Host / FastAPI"]
     HOST a02@-->|Research via MCP| MCP["MCP research server"]
-    MCP a03@-.->|Inference| META["Meta Model API<br/>Muse Spark 1.3"]
-    META a04@-.->|Model response| MCP
+    MCP a03@-.->|Configured inference| META["Meta Model API<br/>Muse Spark 1.3 (default reference)"]
+    META a04@-.->|Response| MCP
     MCP a05@-->|Research artifact| HOST
     HOST --> STORE["Evidence · artifacts · receipts"]
     APP["Modal ASGI App<br/>Optional API hosting"] -.->|Hosts| HOST
 
-    HOST a06@-.->|Help: scoped failure diagnostics| HELP["Help dispatcher<br/>Not yet integrated"]
-    HELP a07@-.->|Meta provider request| META
-    HELP a08@-.->|Baseten API request| BASE["Baseten Model APIs<br/>Muse Spark Open"]
-    BASE a09@-.->|Candidate help response| HELP
-    META a10@-.->|Candidate help response| HELP
-    HELP a11@-.->|Reviewed advice| PLAN["Planning revision + gates"]
+    HOST a06@-.->|Unresolved failure · proposed trigger| HELP["Call for Help hook<br/>Not implemented"]
+    HELP a07@-.->|Keep current task / role / model| ACTIVE["Current agent model binding<br/>No new selection"]
+    ACTIVE a08@-.->|Candidate diagnostics| HELP
+    HELP a09@-.->|Host review and stage gates| CONT["Continue allowed work<br/>or return to Planning"]
 
-    HOST a12@-.->|Admitted Build request| SANDBOX["Modal Sandbox v3<br/>Sandbox.create · exec"]
-    SANDBOX a13@-.->|Export logs, after.tar, evidence.zip| HOST
-    HOST a14@-.->|Independent verification| DONE["Host completion receipt"]
+    HOST a10@-.->|Admitted Build request| SANDBOX["Modal Sandbox v3<br/>Sandbox.create · exec"]
+    SANDBOX a11@-.->|Export candidate evidence| HOST
+    HOST a12@-.->|Independent verification| DONE["Host completion receipt"]
 
     a01@{ animation: fast }
     a02@{ animation: fast }
@@ -138,31 +131,30 @@ flowchart LR
     a09@{ animation: fast }
     a10@{ animation: fast }
     a11@{ animation: fast }
-    a12@{ animation: fast }
-    a13@{ animation: fast }
-    a14@{ animation: slow }
+    a12@{ animation: slow }
 
-    classDef model fill:#073b44,stroke:#4ed3c0,color:#fff,stroke-width:3px;
+    classDef info fill:#17384a,stroke:#6ac8ec,color:#fff,stroke-width:2px;
     classDef host fill:#163b5a,stroke:#91c4ee,color:#fff,stroke-width:2px;
     classDef sandbox fill:#173e43,stroke:#5ad5c5,color:#fff,stroke-width:2px;
-    class META,BASE model;
+    class META,ACTIVE info;
     class HOST host;
     class SANDBOX sandbox;
 ```
 
+| Product / configuration | Information shown | Actual status |
+| --- | --- | --- |
+| **Meta Model API · Muse Spark 1.3** | Default adapter model `muse-spark-1.3` and default endpoint `https://api.meta.ai/v1`; environment overrides may apply | Meta adapter exists; stage-level Help hook is **not implemented** |
+| **Baseten Model APIs · Muse Spark Open** | External inference-service reference only; it is **not** a selectable Help fallback | No Baseten Help adapter or failover in this repository |
+| **Modal Sandbox v3** | Build execution service separate from inference | Standalone implementation exists; integrated full host E2E remains unverified |
+| **Modal ASGI App** | Optional FastAPI hosting; separate from model choice | Source exists; deployment must be verified |
 
-| Product | When OneShot calls it | Exact call and return | Repository status |
-| --- | --- | --- | --- |
-| **Meta Model API · Muse Spark 1.3** | Default model inference; candidate Help diagnosis | \`MetaProvider.generate()\` sends an OpenAI-compatible request to \`https://api.meta.ai/v1\` and receives model text | **Adapter implemented**; Help dispatch not wired |
-| **Baseten Model APIs · Muse Spark Open** | Optional independent Help inference on isolated failures | OpenAI-compatible \`POST\` via \`https://inference.baseten.co/v1\`, model \`meta-models/muse-spark-open\`; returns candidate diagnosis | **Proposed**; no Baseten adapter or Help wiring |
-| **Modal Sandbox · Build Sandbox v3** | Only after trusted host Build Admission | \`modal.Sandbox.create()\` → filesystem upload → \`sandbox.exec()\` → export \`result.json\`, \`after.tar\`, \`evidence.zip\` → terminate | **Standalone adapter in repo**; not connected to host MVP |
-| **Modal ASGI App** | Optional FastAPI hosting | \`modal_app.py\` serves OneShot API; public Audit mode disables Research | Source present; deployment requires live verification |
+**Call for Help contract (proposed, not implemented):** Preserve task/run identity, the interrupted role, and the model/provider already bound to that role. The host issues a scoped diagnostic hook with an error ID and permitted redacted evidence, then validates the resulting advice. **No provider picker, model substitution, independent Help agent, new workflow stage, or automatic retry authorization.** The model continues with its existing identity only after host recovery and admission checks. When an input or Plan changes, the authorized owner must create a revision and rerun its gates.
 
-**Help call contract (proposed):** Host isolates a failed work item → supplies issue ID, permitted evidence references, and redacted diagnostics → invokes a configured inference provider → validates and records its response → submits candidate findings for review → routes approved corrections to Planning. **Neither Meta nor Baseten can authorize a retry or issue a Build receipt.** No model credentials enter Modal Sandbox.
+**Display contract:** The UI may show the configured model ID, endpoint, and observed connector status as read-only metadata. Those values do not prove a model was used for a particular stage; a true per-run model label requires a trusted dispatch/event binding. Operator connection configuration remains separate from the presentation.
 
-The standalone sandbox currently exposes \`modal-build-sandbox validate <request.json>\` followed, after trusted admission, by \`modal-build-sandbox execute <request.json> --app <existing-app>\`. Its outputs are only candidate Build evidence; final integration and verification remain host-owned.
+The standalone sandbox currently exposes `modal-build-sandbox validate <request.json>` followed, after trusted admission, by `modal-build-sandbox execute <request.json> --app <existing-app>`. Its outputs are only candidate Build evidence; final integration and verification remain host-owned.
 
-[Meta provider adapter](agent/runtime/providers/meta.py) · [provider registry](agent/runtime/providers/registry.py) · [Baseten's Muse Spark Open API example](https://dev.meta.ai/docs/muse-spark-open/deploy) · [Modal Sandbox SDK](https://modal.com/docs/sdk/py/latest/Sandbox) · [Sandbox v3 README](deployment/modal/sandbox_v3/README.md)
+[Meta provider adapter](agent/runtime/providers/meta.py) · [provider registry](agent/runtime/providers/registry.py) · [Modal Sandbox SDK](https://modal.com/docs/sdk/py/latest/Sandbox) · [Sandbox v3 README](deployment/modal/sandbox_v3/README.md)
 
 ## What exists today
 

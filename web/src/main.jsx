@@ -593,9 +593,13 @@ function App() {
               <span className="dot" />
               {mcpState.status === 'connected' ? 'MCP connected' : 'MCP disconnected'}
             </span>
-            <span className={modelState.status === 'connected' ? 'chip live' : 'chip muted'}>
+            <span
+              className={modelState.status === 'connected' ? 'chip live' : 'chip muted'}
+              title={`Configured model API: ${modelState.model_id || 'not reported'} · Endpoint: ${modelState.api_base_url || 'not reported'} · Connection: ${modelState.status || 'unknown'}`}
+              aria-label={`Configured model API: ${modelState.model_id || 'not reported'}; connection: ${modelState.status || 'unknown'}; information only`}
+            >
               <span className="dot" />
-              {modelState.status === 'connected' ? 'Model connected' : 'Model disconnected'}
+              {modelState.model_id ? `Model API: ${modelState.model_id}` : 'Model API: not configured'}
             </span>
             <button className="icon-button" type="button" onClick={() => task && fetchDetails(task.task_id).catch((exc) => setError(exc.message))} aria-label="Refresh task">
               <RefreshCw size={16} />
@@ -818,7 +822,8 @@ function App() {
               </section>
 
               <section className="connector-section">
-                <div className="eyebrow">MODEL API CONFIGURATION</div>
+                <div className="eyebrow">MODEL API · OPERATOR CONFIGURATION</div>
+                <p className="connector-meta">Sets a connector endpoint; it does not select or switch the model during a task or Call for Help.</p>
                 <label htmlFor="model-base-url">API base URL</label>
                 <input id="model-base-url" type="url" value={draftModelBaseUrl} onChange={(e) => setDraftModelBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
                 <label htmlFor="model-id">Model ID</label>
@@ -840,7 +845,7 @@ function App() {
                 <div className="tool-list">
                   <div className="tool-head">Saved values</div>
                   <div className="tool-item">
-                    <strong>{modelState.model_id || draftModelId || 'No model selected'}</strong>
+                    <strong>{modelState.model_id || draftModelId || 'No model configured'}</strong>
                     <span>{modelState.api_base_url || draftModelBaseUrl || 'No base URL configured'}</span>
                   </div>
                 </div>
