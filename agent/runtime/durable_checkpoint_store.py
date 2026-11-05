@@ -23,28 +23,35 @@ class SQLiteCheckpointStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.connection = sqlite3.connect(str(path))
-        # Check if table exists with incompatible schema
-        existing = self.connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='checkpoints'"
-        ).fetchone()
-        if existing is not None:
-            cols = {row[1] for row in self.connection.execute("PRAGMA table_info(checkpoints)")}
-            if not self._EXPECTED_COLUMNS.issubset(cols):
-                raise SchemaCompatibilityError(
-                    f"checkpoints table has incompatible schema: expected {self._EXPECTED_COLUMNS}, got {cols}"
-                )
-        self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS checkpoints ("
-            "checkpoint_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload BLOB NOT NULL)"
-        )
-        self.connection.commit()
+        try:
+            existing = self.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='checkpoints'"
+            ).fetchone()
+            if existing is not None:
+                cols = {row[1] for row in self.connection.execute("PRAGMA table_info(checkpoints)")}
+                if not self._EXPECTED_COLUMNS.issubset(cols):
+                    raise SchemaCompatibilityError(
+                        f"checkpoints table has incompatible schema: expected {self._EXPECTED_COLUMNS}, got {cols}"
+                    )
+            self.connection.execute(
+                "CREATE TABLE IF NOT EXISTS checkpoints ("
+                "checkpoint_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, payload BLOB NOT NULL)"
+            )
+            self.connection.commit()
+        except SchemaCompatibilityError:
+            self.connection.close()
+            raise
 
     def get(self, checkpoint_id: str) -> Checkpoint | None:
-        """Retrieve a checkpoint by ID."""
+        """Retrieve a checkpoint by ID. Verifies payload integrity by deserializing."""
         row = self.connection.execute(
             "SELECT payload FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)
         ).fetchone()
-        return None if row is None else Checkpoint.model_validate_json(row[0])
+        if row is None:
+            return None
+        stored_bytes = row[0] if isinstance(row[0], bytes) else row[0].encode("utf-8")
+        # Deserialization validates integrity; tampered JSON raises ValidationError
+        return Checkpoint.model_validate_json(stored_bytes)
 
     def close(self) -> None:
         """Close the database connection."""

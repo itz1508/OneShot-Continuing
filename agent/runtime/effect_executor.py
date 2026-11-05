@@ -125,8 +125,14 @@ class EffectExecutor:
         )
 
     def _clear_pre_effect_checkpoint(self, action_id: str, attempt: int = 1) -> None:
-        """Mark pre-effect checkpoint as completed by writing a completion record."""
+        """Mark pre-effect checkpoint as completed by writing a completion record.
+
+        If no pre-effect checkpoint exists (e.g. crash before write), this is a no-op.
+        """
         checkpoint_key = f"pre-effect-{action_id}-attempt-{attempt}"
+        existing = self._checkpoints.load_checkpoint(checkpoint_key)
+        if existing is None:
+            return  # No pre-effect checkpoint to clear — safe no-op
         completion_data = {
             "type": "post_effect",
             "action_id": action_id,
@@ -168,6 +174,15 @@ class EffectExecutor:
         before mutation, uses atomic writes, and clears the checkpoint
         after successful completion.
         """
+        # Check for existing pre-effect checkpoint from a prior crashed attempt
+        prior = self._has_pre_effect_checkpoint(action_id, attempt)
+        if prior is not None:
+            return BuildActionExecution(
+                action_id=action_id,
+                status=BuildActionStatus.EFFECT_UNCERTAIN,
+                error=f"prior pre-effect checkpoint exists for attempt {attempt}; reconcile before retry",
+            )
+
         # Verify admission — required, not optional
         if action_id not in admission_receipt.authorized_action_ids:
             raise EffectExecutionError(

@@ -172,6 +172,29 @@ class CheckpointStore:
         finally:
             conn.close()
 
+    def load_revision(self, task_id: str, revision: int) -> tuple[int, dict[str, Any], str] | None:
+        """Load a specific checkpoint revision. Raises CheckpointIntegrityError if tampered."""
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            row = conn.execute(
+                "SELECT revision, state_json, state_digest FROM checkpoints WHERE task_id = ? AND revision = ?",
+                (task_id, revision),
+            ).fetchone()
+            if row is None:
+                return None
+            revision_val, state_json, stored_digest = row
+            actual_digest = digest_raw(state_json.encode("utf-8"))
+            if actual_digest != stored_digest:
+                raise CheckpointIntegrityError(
+                    f"checkpoint integrity failure for task {task_id} rev {revision_val}: "
+                    f"stored digest {stored_digest} != recalculated {actual_digest}"
+                )
+            return revision_val, json.loads(state_json), stored_digest
+        finally:
+            conn.close()
+
+    _ALLOWED_OPERATION_TYPES: ClassVar[set[str]] = {"create", "modify", "remove", "verify", "reconcile"}
+
     def record_operation(
         self,
         task_id: str,
@@ -179,7 +202,9 @@ class CheckpointStore:
         operation_type: str,
         operation_data: str,
     ) -> int:
-        """Record an operation in the ledger."""
+        """Record an operation in the ledger. Validates operation_type."""
+        if operation_type not in self._ALLOWED_OPERATION_TYPES:
+            raise CheckpointStoreError(f"unknown operation type: {operation_type}")
         conn = sqlite3.connect(str(self.db_path))
         try:
             cursor = conn.execute(

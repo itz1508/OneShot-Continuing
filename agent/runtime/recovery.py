@@ -84,9 +84,17 @@ class BoundedRecovery:
         self._last_errors[context] = str(error)
         return classification.decision
 
-    def reconcile(self, operation_id: str, operation_data: str) -> str:
-        """Reconcile an uncertain effect. Returns reconciliation result."""
-        return f"reconciled:{operation_id}"
+    def reconcile(self, operation_id: str, operation_data: str) -> dict[str, object]:
+        """Reconcile an uncertain effect. Returns structured reconciliation result.
+
+        Classification is separate from physical recovery — the caller
+        must use EffectExecutor.reconcile_effect() for actual file checks.
+        """
+        return {
+            "operation_id": operation_id,
+            "status": "requires_physical_verification",
+            "message": "Classification only; physical reconciliation via EffectExecutor.reconcile_effect() required.",
+        }
 
     def reset(self, context: str) -> None:
         """Reset retry state for a context."""

@@ -53,10 +53,12 @@ class TestBoundedRecovery:
         assert classification.decision == RecoveryDecision.RECONCILE
 
     def test_reconcile_returns_result(self):
-        """REC07: Reconciliation returns a result."""
+        """REC07: Reconciliation returns a structured result."""
         recovery = BoundedRecovery()
         result = recovery.reconcile("op-001", "some data")
-        assert "reconciled" in result
+        assert isinstance(result, dict)
+        assert result["operation_id"] == "op-001"
+        assert result["status"] == "requires_physical_verification"
 
     def test_reset_clears_state(self):
         """REC08: Reset clears retry state."""
