@@ -18,3 +18,17 @@ test('Research runs through MCP and persists its artifact across browser reload'
   await expect(page.getByRole('dialog', { name: 'Review artifact' })).toBeVisible()
   await expect(page.locator('#file-editor')).toHaveAttribute('readonly', '')
 })
+
+test('Automatic Research sends PRE request and ingests POST without a second user action', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('checkbox', { name: 'Automatically run Research after submit' }).check()
+  await page.getByRole('textbox', { name: 'Task request' }).fill('Research integration requirements')
+  await page.getByRole('button', { name: 'Submit task' }).click()
+
+  const execution = page.locator('.summary-stat').filter({ hasText: 'Execution' }).locator('strong')
+  await expect(execution).toHaveText('research_completed', { timeout: 30000 })
+  for (const name of ['_discovery_pre.json', 'input_request_search.json', '_research.json', '_discovery_post.json']) {
+    await expect(page.locator('.artifact-row').filter({ hasText: name })).toBeVisible()
+  }
+  await expect(page.getByRole('button', { name: 'Run Research' })).toBeDisabled()
+})
