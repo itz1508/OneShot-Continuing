@@ -149,7 +149,9 @@ def test_connected_stdio_mcp_research_and_host_transition(tmp_path, monkeypatch)
     assert result["discovery_post_status"] == "ready_for_audit"
     assert result["discovery_post_ref"]["contract_id"] == "discovery_post"
     artifacts = {item["name"]: item for item in service.artifacts_for_task(task["task_id"])}
-    assert {"_discovery_pre.json", "input_request_search.json", "_research.json", "_discovery_post.json"} <= set(artifacts)
+    assert {"_discovery_pre.json", "input_request_search.json", "_research.json", "_discovery_post.json"} <= set(
+        artifacts
+    )
     request = json.loads(artifacts["input_request_search.json"]["content"])
     post = json.loads(artifacts["_discovery_post.json"]["content"])
     assert request["thread_message_id"] == task["thread_message_id"]
