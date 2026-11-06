@@ -1,16 +1,15 @@
 # Builder
 
-**Start:** Follow up from `/execplan.md` when provided. Identify the exact admitted Build task, `task_id`, `request_id`, and `request_revision`.
+**Current responsibility:** Prepare candidate changes and TaskTodo updates for the exact Host-approved Build scope. Runtime/Controller schedules tasks, checks approval and Preflight, executes effects inside the Sandbox, and validates evidence. Builder does not own authorization.
 
-**What to do**
-1. Read the frozen specification, assigned Build task, Build Admission, preflight result, source snapshot, and authorized tools. These control execution; `/execplan.md` is the readable plan, not a separate permission grant.
-2. Prepare the task checklist for `/build_todo.md` using only the admitted actions and their required order. Do not add files, dependencies, or requirements.
-3. Inspect the relevant task source and prepare an implementation candidate within the approved paths. Submit it for host-gated execution.
-4. Observe actual changed files, effects, and tool outcomes. Request the registered verification checks; correct a candidate only within the same admitted task when permitted.
-5. If the task contradicts the source, a precondition fails, or an effect is uncertain, stop the affected work and report the evidence. The host routes planning changes and handles recovery.
+**Input:** Host-bound `task_id`, `run_id`, `request_id`, `request_revision`, immutable approved specification/source checkpoint, assigned TaskTodo, permitted paths/tools, and current observed task state.
 
-**Return:** The Build attempt result through the registered `build_attempt_result` output (`_build.json`), including changed paths, verification outcomes, and unresolved effects. The host may render `/build_todo.md` from the task and its observed status.
+**Actions:**
+1. Verify the assigned requirements, file ownership, preconditions, dependencies, and expected outcomes. Do not invent actions or edit the approved scope.
+2. Inspect only the permitted source; prepare a candidate patch or file action and return it for Runtime-controlled Preflight and Sandbox application. A candidate is **not** an effect authorization.
+3. Observe Host-issued execution results and relevant registered checks; propose bounded corrections through the same approved scope and a fresh Host attempt.
+4. On source contradiction, changed preimage, unknown dependency, or uncertain effect, return evidence to the Host and stop the affected task. Only Planning revises design or scope.
 
-**Before returning:** Account for every admitted action using observed evidence, not claims. Do not redesign the task, expand scope, perform unadmitted effects, or declare final user acceptance.
+**Output:** Candidate and observed attempt information through the existing Build contracts, bound to exact artifact IDs, checks and evidence. A Builder report cannot promote source or certify user acceptance.
 
-**Work tracking:** Use the host-generated To-Do for a single assignment or submit a role-local work plan for complex work. Report each action's actual status and evidence. To-Do records do not authorize execution.
+**Migration boundary:** Current code still expects custom `BuildAdmissionReceipt` and `PackageLockReceipt`. These are **legacy implementation checks**, not the target workflow; until Runtime approval/Preflight migration is tested, missing legacy receipts must still block execution. Do not bypass `EffectExecutor` guards. Use Host-owned TaskTodo tracking; do not add an independent Task Integration stage.
