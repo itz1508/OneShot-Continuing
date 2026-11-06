@@ -15,7 +15,6 @@ from enum import StrEnum
 from pydantic import Field, model_validator
 
 from agent.contracts.common import (
-    ArtifactRef,
     ContractModel,
     CriterionId,
     EvidenceRef,
@@ -360,7 +359,6 @@ class InputRequest(ContractModel):
 
     supporting_input_refs: tuple[str, ...] = ()
     catalog_matches: tuple[CatalogMatch, ...] = ()
-    catalog_lineage_ref: ArtifactRef | None = None
     research_plan: ResearchPlan | None = None
 
     admission: ResearchAdmission

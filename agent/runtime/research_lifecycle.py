@@ -12,7 +12,7 @@ latest persisted revision is loaded and verified.
 
 from __future__ import annotations
 
-from agent.contracts.common import ArtifactRef, EvidenceRef
+from agent.contracts.common import EvidenceRef
 from agent.contracts.research import (
     AdmissionDisposition,
     ExecutionStatus,
@@ -31,7 +31,6 @@ from agent.runtime.artifact_store import (
     ArtifactStore,
     StaleRevisionError,
 )
-from agent.runtime.canonical_serialization import SERIALIZER_PROFILE
 from agent.runtime.event_store import EventStore
 from agent.runtime.receipt_store import ReceiptStore
 
@@ -90,7 +89,6 @@ class ResearchLifecycle:
             request_id,
             "research_request_created",
             f"created_from={created_from}",
-            event_id=f"research-request-created:{request_id}",
         )
         return request
 
@@ -128,7 +126,6 @@ class ResearchLifecycle:
             updated.request_id,
             "research_request_updated",
             f"revision={new_rev}",
-            event_id=f"research-request-updated:{updated.request_id}:{new_rev}",
         )
         return updated
 
@@ -170,17 +167,6 @@ class ResearchLifecycle:
 
         # Match against catalog
         catalog_match = self._catalog.match(intent, keywords)
-        lineage = self._catalog.lineage_for(input_id, catalog_match)
-        lineage_id = f"catalog-lineage-{input_id}"
-        lineage_digest = self._artifacts.put_immutable(lineage, lineage_id, 1, "catalog_lineage", "1.0")
-        lineage_ref = ArtifactRef(
-            artifact_id=lineage_id,
-            artifact_revision=1,
-            artifact_digest=lineage_digest,
-            contract_id="catalog_lineage",
-            contract_version="1.0",
-            serializer_profile=SERIALIZER_PROFILE,
-        )
 
         # Issue host receipt for admission
         admission_subject = f"research_admission:{parent_request_id}:{input_id}:1"
@@ -208,7 +194,6 @@ class ResearchLifecycle:
             expected_result=expected_result,
             supporting_input_refs=supporting_input_refs,
             catalog_matches=(catalog_match,),
-            catalog_lineage_ref=lineage_ref,
             admission=admission,
         )
 
@@ -235,7 +220,6 @@ class ResearchLifecycle:
             parent_request_id,
             "input_admitted",
             f"input={input_id} intent={intent.value}",
-            event_id=f"research-input-admitted:{parent_request_id}:{input_id}:1",
         )
         return input_request
 
@@ -357,7 +341,6 @@ class ResearchLifecycle:
             parent_request_id,
             "output_produced",
             f"output={output_id} responds_to={responds_to_input_id}@{responds_to_revision}",
-            event_id=f"research-output-produced:{parent_request_id}:{output_id}:1",
         )
         return output
 
@@ -464,7 +447,6 @@ class ResearchLifecycle:
             output.parent_request_id,
             "output_reviewed",
             f"output={output_id} disposition={disposition.value}",
-            event_id=f"research-output-reviewed:{output.parent_request_id}:{output_id}:{new_rev}",
         )
         return updated
 
@@ -540,7 +522,6 @@ class ResearchLifecycle:
             output.parent_request_id,
             "planning_handoff",
             f"output={output_id}",
-            event_id=f"planning-handoff:{output.parent_request_id}:{output_id}:{output.revision}",
         )
         return output
 
@@ -629,7 +610,6 @@ class ResearchLifecycle:
             parent_request_id,
             "input_corrected",
             f"input={input_id} revision={new_rev}",
-            event_id=f"research-input-corrected:{parent_request_id}:{input_id}:{new_rev}",
         )
         return corrected
 
@@ -668,7 +648,6 @@ class ResearchLifecycle:
                 request_id,
                 "reconcile_orphans_detected",
                 f"orphaned_refs={','.join(orphans)}",
-                event_id=f"reconcile-orphans:{request_id}:{request.revision}",
             )
 
         # Verify current_accepted_result_ref if set
@@ -683,20 +662,17 @@ class ResearchLifecycle:
                             request_id,
                             "reconcile_accepted_result_missing",
                             f"ref={request.current_accepted_result_ref}",
-                            event_id=f"reconcile-result-missing:{request_id}:{request.revision}",
                         )
                 except ValueError:
                     self._events.append(
                         request_id,
                         "reconcile_accepted_result_malformed",
                         f"ref={request.current_accepted_result_ref}",
-                        event_id=f"reconcile-result-malformed:{request_id}:{request.revision}",
                     )
 
         self._events.append(
             request_id,
             "reconcile_completed",
             f"children={len(request.child_refs)} orphans={len(orphans)}",
-            event_id=f"reconcile-completed:{request_id}:{request.revision}",
         )
         return request

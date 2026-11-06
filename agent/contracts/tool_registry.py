@@ -18,6 +18,7 @@ StageId = Literal[
     "planning",
     "fixture_validation",
     "build",
+    "build_validation",
 ]
 _PLACEHOLDER = re.compile(r"^\{([a-z][a-z0-9_-]*)\}$")
 _DRIVE = re.compile(r"^[A-Za-z]:")

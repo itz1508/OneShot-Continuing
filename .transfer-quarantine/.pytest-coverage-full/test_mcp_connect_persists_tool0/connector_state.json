@@ -1,0 +1,28 @@
+{
+  "mcp": {
+    "auth_type": "bearer",
+    "connected_at": "",
+    "error": "",
+    "status": "connected",
+    "tools": [
+      {
+        "description": "Research tool",
+        "name": "oneshot_research"
+      },
+      {
+        "description": "Lookup source data",
+        "name": "source_lookup"
+      }
+    ],
+    "transport": "http",
+    "url": "http://127.0.0.1:9222/mcp"
+  },
+  "model": {
+    "api_base_url": "",
+    "connected_at": "",
+    "error": "",
+    "model_id": "",
+    "provider_response": "",
+    "status": "disconnected"
+  }
+}

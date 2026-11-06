@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["evidence_id", "task_id", "thread_id", "subject_revision", "verifier", "sha256", "object_name", "receipt"],
+  "properties": {
+    "evidence_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "subject_revision": {"type": "integer", "minimum": 0},
+    "verifier": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "object_name": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "receipt": {"$ref": "#/$defs/receipt"}
+  },
+  "$defs": {"receipt": {
+    "type": "object", "additionalProperties": false,
+    "required": ["task_id", "thread_id", "revision", "command", "exit_code", "observed", "timestamp", "cwd", "receipt_path", "source_files", "source_before_sha256", "source_after_sha256", "source_unchanged"],
+    "properties": {
+      "task_id": {"type": "string", "minLength": 1},
+      "thread_id": {"type": "string", "minLength": 1},
+      "revision": {"type": "integer", "minimum": 0},
+      "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+      "exit_code": {"const": 0},
+      "observed": {"type": "string", "minLength": 1},
+      "timestamp": {"type": "string", "format": "date-time"},
+      "cwd": {"type": "string", "minLength": 1},
+      "receipt_path": {"type": "string", "minLength": 1},
+      "source_files": {"type": "object", "maxProperties": 5000,
+        "propertyNames": {"minLength": 1},
+        "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+      "source_before_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "source_after_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "source_unchanged": {"const": true}
+    }
+  }}
+}

@@ -1,0 +1,3649 @@
+diff --git a/.agents/contracts/workflow.yaml b/.agents/contracts/workflow.yaml
+index ca9ecf7..e257a63 100644
+--- a/.agents/contracts/workflow.yaml
++++ b/.agents/contracts/workflow.yaml
+@@ -1,5 +1,5 @@
+ # OneShot single end-to-end workflow contract
+-# Six role stages and host-owned services share this one registered contract.
++# Five stages and host-owned services share this one registered contract.
+ bundle:
+   bundle_id: oneshot_end_to_end
+   contract_version: "1.0"
+@@ -10,7 +10,6 @@ bundle:
+     - planning
+     - fixture_validation
+     - build
+-    - build_validation
+   stores:
+     artifacts: artifact_store
+     receipts: receipt_store
+@@ -40,7 +39,6 @@ bundle:
+       - planning
+       - fixture_validation
+       - build
+-      - build_validation
+     persistence: artifact_store
+     progress_revisions: compare_and_swap
+     events: event_store
+@@ -83,7 +81,7 @@ execution:
+     - effect_execution
+     - task_integration
+     - verification_barrier
+-    - build_validation
++    - build_verification
+     - integrated_source_promotion
+     - run_cleanup
+   runtime_output_allocation: before_every_role_output
+@@ -2628,418 +2626,418 @@ role_workflows:
+             - command_result_artifacts
+             - evidence_bundle
+             - material_checkpoints
+-  build_validation:
+-    id: build_validation
+-    stage: build_validation
+-    version: 1
+-    # ============================================================
+-    # Build Verifier workflow
+-    # ============================================================
+-    
+-    workflow:
+-      stage_id: build_validation
+-      role_id: build_verifier
+-      executor_id: build_verifier_executor
+-      stage_revision_source: host_controller
+-    
+-      purpose:
+-        summary: >-
+-          Independently verify the complete integrated source against the frozen
+-          specification, accepted criteria, required command profiles, and
+-          observable product behavior.
+-    
+-      success_contract:
+-        derived_from: accepted_user_intent_and_supplied_criteria
+-        success_meaning: Independently demonstrate whether the actual integrated product satisfies the 
+-          accepted user success criteria using real entrypoints and observable evidence, without assuming 
+-          Builder success.
+-        observable_conditions:
+-          - accepted_criteria_observed
+-          - required_checks_executed_or_explicitly_blocked
+-          - independent_evidence_and_source_identity_verified
+-        criteria_completeness_gate: false
+-      request_result_exchange:
+-        mode: bidirectional_request_result
+-        receives_from: host_integrated_build
+-        returns_result_to: host_completion_gate
+-        routing_authority: host_controller
+-        prohibits:
+-          - builder_self_certification
+-          - source_modification
+-        input_request_ref_source: host_request_router
+-      input_schema:
+-        $schema: https://json-schema.org/draft/2020-12/schema
+-        title: build verification input request/result contract
+-        type: object
+-        additionalProperties: false
+-        required:
+-          - request_id
+-          - request_revision
+-          - task_id
+-          - user_intent_ref
+-          - frozen_specification_ref
+-          - integrated_source_ref
+-          - completed_task_result_refs
+-          - accepted_criterion_refs
+-        properties:
+-          request_id:
+-            type: string
+-            pattern: ^[A-Za-z0-9_-]{1,128}$
+-          request_revision:
+-            type: integer
+-            minimum: 1
+-          task_id:
+-            type: string
+-            pattern: ^[A-Za-z0-9_-]{1,128}$
+-          user_intent_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-          frozen_specification_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-          integrated_source_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-          completed_task_result_refs:
+-            type: array
+-            items:
+-              $ref: urn:oneshot:contract:artifact_ref:1.0
+-          accepted_criterion_refs:
+-            type: array
+-            items:
+-              $ref: urn:oneshot:contract:artifact_ref:1.0
+-      output_schema:
+-        $schema: https://json-schema.org/draft/2020-12/schema
+-        title: build verification output request/result contract
+-        type: object
+-        additionalProperties: false
+-        required:
+-          - request_id
+-          - request_revision
+-          - task_id
+-          - user_intent_ref
+-          - status
+-          - input_request_ref
+-        properties:
+-          request_id:
+-            type: string
+-            pattern: ^[A-Za-z0-9_-]{1,128}$
+-          request_revision:
+-            type: integer
+-            minimum: 1
+-          task_id:
+-            type: string
+-            pattern: ^[A-Za-z0-9_-]{1,128}$
+-          user_intent_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-          status:
+-            type: string
+-            enum:
+-              - completed
+-              - failed
+-              - blocked
+-              - not_run
+-              - skipped
+-          unresolved:
+-            type: array
+-            items:
+-              type: string
+-          build_validation_record_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-          criterion_observations:
+-            type: array
+-            items:
+-              type: object
+-          command_result_refs:
+-            type: array
+-            items:
+-              $ref: urn:oneshot:contract:artifact_ref:1.0
+-          integrated_source_digest:
+-            type: string
+-            pattern: ^[a-f0-9]{64}$
+-          limitations:
+-            type: array
+-            items:
+-              type: string
+-          input_request_ref:
+-            $ref: urn:oneshot:contract:artifact_ref:1.0
+-        allOf:
+-          - if:
+-              required:
+-                - status
+-              properties:
+-                status:
+-                  const: completed
+-            then:
+-              required:
+-                - build_validation_record_ref
+-                - criterion_observations
++      independent_verification:
++        id: build_verification
++        stage: build
++        version: 1
++        # ============================================================
++        # Independent verifier within Build
++        # ============================================================
++
++        workflow:
++          stage_id: build
++          role_id: build_verifier
++          executor_id: build_verifier_executor
++          stage_revision_source: host_controller
++
++          purpose:
++            summary: >-
++              Independently verify the complete integrated source against the frozen
++              specification, accepted criteria, required command profiles, and
++              observable product behavior.
++
++          success_contract:
++            derived_from: accepted_user_intent_and_supplied_criteria
++            success_meaning: Independently demonstrate whether the actual integrated product satisfies the
++              accepted user success criteria using real entrypoints and observable evidence, without assuming
++              Builder success.
++            observable_conditions:
++              - accepted_criteria_observed
++              - required_checks_executed_or_explicitly_blocked
++              - independent_evidence_and_source_identity_verified
++            criteria_completeness_gate: false
++          request_result_exchange:
++            mode: bidirectional_request_result
++            receives_from: host_integrated_build
++            returns_result_to: host_completion_gate
++            routing_authority: host_controller
++            prohibits:
++              - builder_self_certification
++              - source_modification
++            input_request_ref_source: host_request_router
++          input_schema:
++            $schema: https://json-schema.org/draft/2020-12/schema
++            title: build verification input request/result contract
++            type: object
++            additionalProperties: false
++            required:
++              - request_id
++              - request_revision
++              - task_id
++              - user_intent_ref
++              - frozen_specification_ref
++              - integrated_source_ref
++              - completed_task_result_refs
++              - accepted_criterion_refs
++            properties:
++              request_id:
++                type: string
++                pattern: ^[A-Za-z0-9_-]{1,128}$
++              request_revision:
++                type: integer
++                minimum: 1
++              task_id:
++                type: string
++                pattern: ^[A-Za-z0-9_-]{1,128}$
++              user_intent_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++              frozen_specification_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++              integrated_source_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++              completed_task_result_refs:
++                type: array
++                items:
++                  $ref: urn:oneshot:contract:artifact_ref:1.0
++              accepted_criterion_refs:
++                type: array
++                items:
++                  $ref: urn:oneshot:contract:artifact_ref:1.0
++          output_schema:
++            $schema: https://json-schema.org/draft/2020-12/schema
++            title: build verification output request/result contract
++            type: object
++            additionalProperties: false
++            required:
++              - request_id
++              - request_revision
++              - task_id
++              - user_intent_ref
++              - status
++              - input_request_ref
++            properties:
++              request_id:
++                type: string
++                pattern: ^[A-Za-z0-9_-]{1,128}$
++              request_revision:
++                type: integer
++                minimum: 1
++              task_id:
++                type: string
++                pattern: ^[A-Za-z0-9_-]{1,128}$
++              user_intent_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++              status:
++                type: string
++                enum:
++                  - completed
++                  - failed
++                  - blocked
++                  - not_run
++                  - skipped
++              unresolved:
++                type: array
++                items:
++                  type: string
++              build_validation_record_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++              criterion_observations:
++                type: array
++                items:
++                  type: object
++              command_result_refs:
++                type: array
++                items:
++                  $ref: urn:oneshot:contract:artifact_ref:1.0
++              integrated_source_digest:
++                type: string
++                pattern: ^[a-f0-9]{64}$
++              limitations:
++                type: array
++                items:
++                  type: string
++              input_request_ref:
++                $ref: urn:oneshot:contract:artifact_ref:1.0
++            allOf:
++              - if:
++                  required:
++                    - status
++                  properties:
++                    status:
++                      const: completed
++                then:
++                  required:
++                    - build_validation_record_ref
++                    - criterion_observations
++                    - integrated_source_digest
++          schema_validation:
++            validator_owner: host
++            dialect: json_schema_2020_12
++            external_contract_refs: resolve_from_registered_contracts
++            unresolved_external_ref: reject
++            exact_request_revision_binding: true
++            user_intent_binding_required: true
++            receipt_authority: trusted_host_only
++            validate_before_persistence: true
++            validate_after_reopen: true
++            failure_output_policy: return_bound_blocked_result_without_fabricated_stage_artifacts
++            cross_reference_validation:
++              - request_id
++              - request_revision
++              - task_id
++              - user_intent_ref
++              - parent_artifact_revision
++              - receipt_subject_and_issuer
++            require_output_input_request_ref_match: true
++          inputs:
++            required:
++              - input_id: input_request
++                contract_id: build_validation_input_request
++                schema_source: workflow.input_schema
++                resolution: host_bound_request_artifact
++                source: host_request_router
++                receipt_required: true
++              - input_id: workflow_input
++                contract_id: workflow_input
++                resolution: exact_artifact_ref
++
++              - input_id: research_record
++                contract_id: research_record
++                resolution: exact_artifact_ref
++
++              - input_id: audit_discovery_record
++                contract_id: audit_discovery_record
++                resolution: exact_artifact_ref
++
++              - input_id: frozen_specification
++                contract_id: build_specification
++                resolution: exact_artifact_ref
++                receipt_required: true
++
++              - input_id: build_task_set
++                contract_id: build_task_set
++                resolution: exact_artifact_ref
++
++              - input_id: completed_task_results
++                contract_id: task_integration_result
++                resolution: exact_artifact_ref
++                multiple: true
++
++              - input_id: integrated_source
++                contract_id: integrated_source_snapshot
++                resolution: exact_artifact_ref
++
++              - input_id: tool_registry_snapshot
++                contract_id: tool_registry_snapshot
++                resolution: exact_artifact_ref
++
++              - input_id: sandbox_profile
++                contract_id: sandbox_profile
++                resolution: exact_artifact_ref
++
++          execution:
++            provider_session_required: true
++
++            model_loop:
++              enabled: true
++              maximum_tool_calls: 160
++              maximum_validation_attempts: 3
++              completion_condition: build_validation_record_submitted
++
++            required_work:
++              - step_id: load_validation_scope
++                produces:
++                  - accepted_requirements
++                  - acceptance_criteria
++                  - frozen_actions
++                  - completed_task_results
++
++              - step_id: verify_task_completion
++                produces:
++                  - task_completion_observations
++
++              - step_id: resolve_validation_tools
++                produces:
++                  - resolved_test_invocations
++
++              - step_id: execute_required_checks
++                produces:
++                  - command_results
++
++              - step_id: observe_product_behavior
++                produces:
++                  - criterion_observations
++
++              - step_id: compare_against_criteria
++                produces:
++                  - criterion_results
++
++              - step_id: submit_validation_record
++                produces:
++                  - build_validation_record_candidate
++
++          tool_projection:
++            registry_ref_source: package_lock
++
++            capabilities:
++              - capability_id: artifacts.get_artifact
++                wire_name: get_artifact
++                permission_token: artifacts.read
++
++              - capability_id: repository.list_files
++                wire_name: list_files
++                permission_token: validation_repository.read
++
++              - capability_id: repository.read_file
++                wire_name: read_file
++                permission_token: validation_repository.read
++
++              - capability_id: repository.search_files
++                wire_name: search_files
++                permission_token: validation_repository.search
++
++              - capability_id: sandbox.run_registered
++                wire_name: run_verification
++                permission_token: validation_tool.execute
++
++              - capability_id: task_management.get_status
++                wire_name: get_task_status
++                permission_token: task_management.read
++
++            command_policy:
++              raw_argv_allowed: false
++              command_profile_source: frozen_specification
++              registry_resolution_required: true
++              effect_time_resolution_required: true
++
++          outputs:
++            - output_slot: primary
++              contract_id: build_validation_record
++              contract_version: "1.0"
++              media_type: application/json
++
++              required_sections:
++                - workflow_input_ref
++                - frozen_specification_ref
++                - task_set_ref
++                - completed_task_refs
++                - integrated_source_ref
+                 - integrated_source_digest
+-      schema_validation:
+-        validator_owner: host
+-        dialect: json_schema_2020_12
+-        external_contract_refs: resolve_from_registered_contracts
+-        unresolved_external_ref: reject
+-        exact_request_revision_binding: true
+-        user_intent_binding_required: true
+-        receipt_authority: trusted_host_only
+-        validate_before_persistence: true
+-        validate_after_reopen: true
+-        failure_output_policy: return_bound_blocked_result_without_fabricated_stage_artifacts
+-        cross_reference_validation:
+-          - request_id
+-          - request_revision
+-          - task_id
+-          - user_intent_ref
+-          - parent_artifact_revision
+-          - receipt_subject_and_issuer
+-        require_output_input_request_ref_match: true
+-      inputs:
+-        required:
+-          - input_id: input_request
+-            contract_id: build_validation_input_request
+-            schema_source: workflow.input_schema
+-            resolution: host_bound_request_artifact
+-            source: host_request_router
+-            receipt_required: true
+-          - input_id: workflow_input
+-            contract_id: workflow_input
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: research_record
+-            contract_id: research_record
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: audit_discovery_record
+-            contract_id: audit_discovery_record
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: frozen_specification
+-            contract_id: build_specification
+-            resolution: exact_artifact_ref
+-            receipt_required: true
+-    
+-          - input_id: build_task_set
+-            contract_id: build_task_set
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: completed_task_results
+-            contract_id: task_integration_result
+-            resolution: exact_artifact_ref
+-            multiple: true
+-    
+-          - input_id: integrated_source
+-            contract_id: integrated_source_snapshot
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: tool_registry_snapshot
+-            contract_id: tool_registry_snapshot
+-            resolution: exact_artifact_ref
+-    
+-          - input_id: sandbox_profile
+-            contract_id: sandbox_profile
+-            resolution: exact_artifact_ref
+-    
+-      execution:
+-        provider_session_required: true
+-    
+-        model_loop:
+-          enabled: true
+-          maximum_tool_calls: 160
+-          maximum_validation_attempts: 3
+-          completion_condition: build_validation_record_submitted
+-    
+-        required_work:
+-          - step_id: load_validation_scope
+-            produces:
+-              - accepted_requirements
+-              - acceptance_criteria
+-              - frozen_actions
++                - verification_result_refs
++                - criterion_observations
++                - unresolved
++                - limitations
++                - execution_status
++                - diagnostic_status
++
++          persistence:
++            temporary_output:
++              allocation_owner: host
++              runtime_root_source: runtime_root_registry
++              filename_generation: host_generated
++
++            authoritative_output:
++              owner: host
++              backend: artifact_store
++              immutable: true
++              reopen_after_persist: true
++              verify_digest_after_reopen: true
++
++          completion:
++            success_requirements:
++              all_required_tasks_completed: true
++              all_effects_reconciled: true
++              all_required_commands_executed: true
++              all_required_commands_valid: true
++              acceptance_criteria_observed: true
++              integrated_source_digest_verified: true
++
++            receipt:
++              issuer: host
++              subject_contract_id: build_validation_completion_subject
++              subject_contract_version: "1.0"
++
++              binds:
++                - workspace_id
++                - task_id
++                - run_id
++                - workflow_input_ref
++                - frozen_specification_ref
++                - task_set_ref
++                - completed_task_refs
++                - integrated_source_ref
++                - build_validation_record_ref
++
++                - input_request_ref
++            successful_result:
++              execution_status: completed
++              diagnostic_status: valid
++
++            host_completion_rule: persist_reopen_validate_exact_output_then_issue_trusted_receipt
++          handoff:
++            target_stage: cleanup
++            contract_id: validation_cleanup_handoff
++            contract_version: "1.0"
++
++            required_refs:
++              - input_request_ref
++              - build_validation_record_ref
++              - final_verification_receipt_ref
++              - integrated_source_ref
++              - completed_task_refs
++
++            transition_owner: host_controller
++
++          checkpoints:
++            - checkpoint_id: validation_entry
++              resume_point: load_validation_scope
++
++            - checkpoint_id: validation_commands_resolved
++              resume_point: execute_required_checks
++
++            - checkpoint_id: validation_checks_completed
++              resume_point: compare_against_criteria
++
++            - checkpoint_id: validation_output_persisted
++              resume_point: issue_final_verification_receipt
++
++            - checkpoint_id: validation_handoff_ready
++              resume_point: host_cleanup
++
++          recovery:
++            inspect:
++              - integrated_source
+               - completed_task_results
+-    
+-          - step_id: verify_task_completion
+-            produces:
+-              - task_completion_observations
+-    
+-          - step_id: resolve_validation_tools
+-            produces:
+-              - resolved_test_invocations
+-    
+-          - step_id: execute_required_checks
+-            produces:
+               - command_results
+-    
+-          - step_id: observe_product_behavior
+-            produces:
+               - criterion_observations
+-    
+-          - step_id: compare_against_criteria
+-            produces:
+-              - criterion_results
+-    
+-          - step_id: submit_validation_record
+-            produces:
+-              - build_validation_record_candidate
+-    
+-      tool_projection:
+-        registry_ref_source: package_lock
+-    
+-        capabilities:
+-          - capability_id: artifacts.get_artifact
+-            wire_name: get_artifact
+-            permission_token: artifacts.read
+-    
+-          - capability_id: repository.list_files
+-            wire_name: list_files
+-            permission_token: validation_repository.read
+-    
+-          - capability_id: repository.read_file
+-            wire_name: read_file
+-            permission_token: validation_repository.read
+-    
+-          - capability_id: repository.search_files
+-            wire_name: search_files
+-            permission_token: validation_repository.search
+-    
+-          - capability_id: sandbox.run_registered
+-            wire_name: run_verification
+-            permission_token: validation_tool.execute
+-    
+-          - capability_id: task_management.get_status
+-            wire_name: get_task_status
+-            permission_token: task_management.read
+-    
+-        command_policy:
+-          raw_argv_allowed: false
+-          command_profile_source: frozen_specification
+-          registry_resolution_required: true
+-          effect_time_resolution_required: true
+-    
+-      outputs:
+-        - output_slot: primary
+-          contract_id: build_validation_record
+-          contract_version: "1.0"
+-          media_type: application/json
+-    
+-          required_sections:
+-            - workflow_input_ref
+-            - frozen_specification_ref
+-            - task_set_ref
+-            - completed_task_refs
+-            - integrated_source_ref
+-            - integrated_source_digest
+-            - verification_result_refs
+-            - criterion_observations
+-            - unresolved
+-            - limitations
+-            - execution_status
+-            - diagnostic_status
+-    
+-      persistence:
+-        temporary_output:
+-          allocation_owner: host
+-          runtime_root_source: runtime_root_registry
+-          filename_generation: host_generated
+-    
+-        authoritative_output:
+-          owner: host
+-          backend: artifact_store
+-          immutable: true
+-          reopen_after_persist: true
+-          verify_digest_after_reopen: true
+-    
+-      completion:
+-        success_requirements:
+-          all_required_tasks_completed: true
+-          all_effects_reconciled: true
+-          all_required_commands_executed: true
+-          all_required_commands_valid: true
+-          acceptance_criteria_observed: true
+-          integrated_source_digest_verified: true
+-    
+-        receipt:
+-          issuer: host
+-          subject_contract_id: build_validation_completion_subject
+-          subject_contract_version: "1.0"
+-    
+-          binds:
+-            - workspace_id
+-            - task_id
+-            - run_id
+-            - workflow_input_ref
+-            - frozen_specification_ref
+-            - task_set_ref
+-            - completed_task_refs
+-            - integrated_source_ref
+-            - build_validation_record_ref
+-    
+-            - input_request_ref
+-        successful_result:
+-          execution_status: completed
+-          diagnostic_status: valid
+-    
+-        host_completion_rule: persist_reopen_validate_exact_output_then_issue_trusted_receipt
+-      handoff:
+-        target_stage: cleanup
+-        contract_id: validation_cleanup_handoff
+-        contract_version: "1.0"
+-    
+-        required_refs:
+-          - input_request_ref
+-          - build_validation_record_ref
+-          - final_verification_receipt_ref
+-          - integrated_source_ref
+-          - completed_task_refs
+-    
+-        transition_owner: host_controller
+-    
+-      checkpoints:
+-        - checkpoint_id: validation_entry
+-          resume_point: load_validation_scope
+-    
+-        - checkpoint_id: validation_commands_resolved
+-          resume_point: execute_required_checks
+-    
+-        - checkpoint_id: validation_checks_completed
+-          resume_point: compare_against_criteria
+-    
+-        - checkpoint_id: validation_output_persisted
+-          resume_point: issue_final_verification_receipt
+-    
+-        - checkpoint_id: validation_handoff_ready
+-          resume_point: host_cleanup
+-    
+-      recovery:
+-        inspect:
+-          - integrated_source
+-          - completed_task_results
+-          - command_results
+-          - criterion_observations
+-          - validation_record
+-          - final_verification_receipt
+-          - lifecycle_events
+-    
+-        classifications:
+-          - not_started
+-          - scope_loaded
+-          - execution_in_progress
+-          - observations_persisted
+-          - output_persisted
+-          - receipt_issued
+-          - handoff_ready
+-          - completed
+-          - uncertainty
+-    
+-      cleanup:
+-        after_successful_handoff:
+-          delete:
+-            - temporary_validation_workspace
+-            - temporary_command_output
+-            - temporary_rendered_reports
+-            - duplicate_evidence_projections
+-    
+-          retain:
+-            - build_validation_record
+-            - final_verification_receipt
+-            - criterion_observation_artifacts
+-            - command_result_artifacts
+-            - integrated_source_ref
+-            - completed_task_results
+-            - material_checkpoints
++              - validation_record
++              - final_verification_receipt
++              - lifecycle_events
++
++            classifications:
++              - not_started
++              - scope_loaded
++              - execution_in_progress
++              - observations_persisted
++              - output_persisted
++              - receipt_issued
++              - handoff_ready
++              - completed
++              - uncertainty
++
++          cleanup:
++            after_successful_handoff:
++              delete:
++                - temporary_validation_workspace
++                - temporary_command_output
++                - temporary_rendered_reports
++                - duplicate_evidence_projections
++
++              retain:
++                - build_validation_record
++                - final_verification_receipt
++                - criterion_observation_artifacts
++                - command_result_artifacts
++                - integrated_source_ref
++                - completed_task_results
++                - material_checkpoints
+diff --git a/.gitignore b/.gitignore
+index 58eedc0..46c27d5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -19,6 +19,7 @@ venv/
+ .mypy_cache/
+ .ruff_cache/
+ .pytest_cache/
++.pytest-*/
+ *.egg-info/
+ 
+ # State (runtime data, not source)
+diff --git a/README.md b/README.md
+index 85e7f21..16cfc90 100644
+--- a/README.md
++++ b/README.md
+@@ -8,9 +8,41 @@ OneShot separates AI research and planning from execution authority. It records
+ [![MVP integration](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml)
+ [![Research and Audit](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml)
+ 
+-## Six-stage workflow and its gates
++## OneShot — Automated Process-Context Workflow
+ 
+-The user defines the outcome; Research records **what success looks like**, Audit Discovery inspects the repository, and Planning specifies the change. The host must admit Build before dispatching work to **Modal Sandbox**. Moving arrows illustrate the designed lifecycle; the complete workflow is **not yet connected through the MVP**.
++The table summarizes the intended responsibilities. The [workflow contract](.agents/contracts/workflow.yaml) defines their registered inputs, outputs, and host gates; it does not by itself prove that every route runs end to end.
++
++### Workflow
++
++| Sequence | Responsibility | Context and output |
++|---|---|---|
++| 1 | **Establish scope** | Inspects `git status`, relevant code, and contracts; defines the authorized implementation scope before any modification. |
++| 2 | **Research** | Establishes evidence, not implementation design. Investigates information, dependencies, and technical references; returns evidence, source references, and unresolved questions. |
++| 3 | **Audit Discovery** | Read-only repository inspection. Traces paths and dependencies, identifies gaps, and records grounded findings and candidate CodeIntent. |
++| 4 | **Planning** | Owns architecture and design decisions and the BuildSpecification. Performs code review, gap analysis, Scanner review, and dependency mapping. No source writes. |
++| 5 | **Validation & Admission** | Host-owned. The host validates and freezes the plan under default-deny; Build is admitted only after preflight checks pass. The frozen plan is the authorized implementation scope. |
++| 6 | **Build** | Executes only admitted operations; preconditions are checked at effect time. Runs in the sandbox, applies the patch, runs admitted checks, and records actual effects and evidence. |
++| 7 | **Independent E2E Verification** | Runs real E2E checks against the acceptance criteria using actual execution evidence. No self-certification. |
++
++### Automated process context
++
++**Context management operates within the workflow, not as additional workflow stages.**
++
++For every agent handoff:
++
++1. The system identifies the receiving agent's required inputs using its registered input contract.
++2. Relevant context is automatically selected and summarized where appropriate.
++3. Required upstream outputs, guidance, and artifact references are supplied to the receiving agent.
++4. The agent performs its assigned responsibility and returns the output defined by its contract.
++5. The system persists the output and makes the relevant result available to downstream consumers.
++
++Original artifacts remain authoritative. Summaries are contextual representations, not replacements for evidence, requirements, or source records.
++
++### Runtime notes
++
++Meta Muse Spark 1.3 is the configured default provider; Claude Agent SDK and Codex SDK are optional adapters. The `echo` provider is a test double. Keep secrets in environment variables. The [historical audit records](audit/) retain evidence from earlier checks; current readiness requires a fresh source audit and runtime verification.
++
++**Implementation status:** The declared workflow contracts, agent guidance, and runtime must be audited separately to determine which automated context operations and handoffs are connected end to end.
+ 
+ ```mermaid
+ flowchart TD
+diff --git a/agent/cli.py b/agent/cli.py
+index f5a0a0d..3892510 100644
+--- a/agent/cli.py
++++ b/agent/cli.py
+@@ -105,7 +105,7 @@ def cmd_verify(task_id: str, state_root: str = "/tmp/oneshot-state") -> int:
+     if state is None:
+         print(f"Task {task_id}: not found")
+         return 1
+-    if state.current_stage == Stage.BUILD_VALIDATION and Stage.BUILD_VALIDATION in state.completed_stages:
++    if state.current_stage == Stage.BUILD and Stage.BUILD in state.completed_stages:
+         print(f"Task {task_id}: COMPLETED")
+         return 0
+     print(f"Task {task_id}: in progress (stage: {state.current_stage})")
+diff --git a/agent/contracts/build_validation.py b/agent/contracts/build_validation.py
+index 09b75f7..c4d19e8 100644
+--- a/agent/contracts/build_validation.py
++++ b/agent/contracts/build_validation.py
+@@ -1,27 +1,53 @@
+-"""Build Validation stage contract — independent E2E verification."""
++"""Independent E2E verification evidence within the Build stage."""
+ 
+ from __future__ import annotations
+ 
+ from enum import StrEnum
+ 
+-from pydantic import Field
++from pydantic import Field, model_validator
+ 
+-from agent.contracts.common import ArtifactRef, ContractModel, StepResult
++from agent.contracts.common import ArtifactRef, ContractModel, DiagnosticStatus, StepResult
++from agent.contracts.planning import IssueType
+ 
+ 
+ class CriterionResult(StrEnum):
+-    PASS = "pass"
+-    FAIL = "fail"
++    VALID = "valid"
++    NOT_VALID = "not_valid"
+     BLOCKED = "blocked"
+     NOT_RUN = "not_run"
+ 
+ 
++class ValidationIssueInput(ContractModel):
++    """A verifier observation for the next Planning revision, not a PlanningIssue."""
++
++    issue_type: IssueType
++    reason: str = Field(min_length=1)
++    evidence_status: DiagnosticStatus
++
++
++class ValidationIssueSource(ContractModel):
++    check_id: str = Field(min_length=1)
++    outcome: CriterionResult
++    issue: ValidationIssueInput
++    evidence_refs: tuple[str, ...] = ()
++
++
+ class ObservedCriterionResult(ContractModel):
+     criterion_id: str = Field(min_length=1)
+     observed_result: str = Field(min_length=1)
+     outcome: CriterionResult = CriterionResult.NOT_RUN
+     evidence_refs: tuple[str, ...] = ()
+     independent_observation: str = Field(min_length=1)
++    issue_input: ValidationIssueInput | None = None
++
++    @model_validator(mode="after")
++    def validate_outcome(self) -> ObservedCriterionResult:
++        if self.outcome is CriterionResult.VALID:
++            if not self.evidence_refs or self.issue_input is not None:
++                raise ValueError("valid criterion requires evidence and no issue input")
++        elif self.issue_input is None:
++            raise ValueError("criterion without valid outcome requires a categorized Planning input")
++        return self
+ 
+ 
+ class E2EResult(ContractModel):
+@@ -32,6 +58,17 @@ class E2EResult(ContractModel):
+     stderr_digest: str = ""
+     duration_ms: int = 0
+     outcome: CriterionResult = CriterionResult.NOT_RUN
++    evidence_refs: tuple[str, ...] = ()
++    issue_input: ValidationIssueInput | None = None
++
++    @model_validator(mode="after")
++    def validate_outcome(self) -> E2EResult:
++        if self.outcome is CriterionResult.VALID:
++            if self.exit_code != 0 or not self.evidence_refs or self.issue_input is not None:
++                raise ValueError("valid E2E check requires zero exit, evidence, and no issue input")
++        elif self.issue_input is None:
++            raise ValueError("E2E check without valid outcome requires a categorized Planning input")
++        return self
+ 
+ 
+ class BuildValidationInput(ContractModel):
+@@ -47,3 +84,38 @@ class BuildValidationRecord(ContractModel):
+     criterion_results: tuple[ObservedCriterionResult, ...] = ()
+     e2e_results: tuple[E2EResult, ...] = ()
+     step_results: tuple[StepResult, ...] = ()
++
++    def planning_issue_inputs(self) -> tuple[ValidationIssueSource, ...]:
++        """Expose verifier findings for host routing without creating Planning issues."""
++        issues: list[ValidationIssueSource] = []
++        for item in self.criterion_results:
++            if item.issue_input is not None:
++                issues.append(
++                    ValidationIssueSource(
++                        check_id=item.criterion_id,
++                        outcome=item.outcome,
++                        issue=item.issue_input,
++                        evidence_refs=item.evidence_refs,
++                    )
++                )
++        for e2e in self.e2e_results:
++            if e2e.issue_input is not None:
++                issues.append(
++                    ValidationIssueSource(
++                        check_id=e2e.e2e_id,
++                        outcome=e2e.outcome,
++                        issue=e2e.issue_input,
++                        evidence_refs=e2e.evidence_refs,
++                    )
++                )
++        return tuple(issues)
++
++
++class PlanningReworkInput(ContractModel):
++    """Host-routed verifier findings; only the Planner may create PlanningIssue."""
++
++    task_id: str = Field(min_length=1)
++    run_id: str = Field(min_length=1)
++    planning_revision: int = Field(ge=2)
++    validation_ref: ArtifactRef
++    issue_sources: tuple[ValidationIssueSource, ...] = Field(min_length=1)
+diff --git a/agent/contracts/host.py b/agent/contracts/host.py
+index 08ed17e..eaa61d6 100644
+--- a/agent/contracts/host.py
++++ b/agent/contracts/host.py
+@@ -102,7 +102,7 @@ class BuildAdmissionReceipt(ContractModel):
+     authorized_action_ids: tuple[str, ...] = Field(min_length=1)
+     authorized_tool_ids: tuple[str, ...] = ()
+     tool_registry_ref: ArtifactRef | None = None
+-    recovery_readiness_ref: str | None = None
++    recovery_readiness_ref: ArtifactRef | None = None
+     receipt_ref: ReceiptRef
+ 
+ 
+@@ -111,12 +111,14 @@ def admission_receipt_subject(
+     authorized_action_ids: tuple[str, ...],
+     authorized_tool_ids: tuple[str, ...] = (),
+     tool_registry_ref: ArtifactRef | None = None,
++    recovery_readiness_ref: ArtifactRef | None = None,
+ ) -> str:
+     """One canonical host-bound receipt subject for issue AND verification."""
+     return (
+         f"{lock_receipt_ref.receipt_id}:{lock_receipt_ref.receipt_digest}:"
+         f"{':'.join(authorized_action_ids)}:{':'.join(authorized_tool_ids)}:"
+-        f"{tool_registry_ref.artifact_digest if tool_registry_ref else 'no-tools'}"
++        f"{tool_registry_ref.artifact_digest if tool_registry_ref else 'no-tools'}:"
++        f"{recovery_readiness_ref.artifact_digest if recovery_readiness_ref else 'no-recovery-readiness'}"
+     )
+ 
+ 
+diff --git a/agent/contracts/research.py b/agent/contracts/research.py
+index 387f095..b112c65 100644
+--- a/agent/contracts/research.py
++++ b/agent/contracts/research.py
+@@ -15,6 +15,7 @@ from enum import StrEnum
+ from pydantic import Field, model_validator
+ 
+ from agent.contracts.common import (
++    ArtifactRef,
+     ContractModel,
+     CriterionId,
+     EvidenceRef,
+@@ -359,6 +360,7 @@ class InputRequest(ContractModel):
+ 
+     supporting_input_refs: tuple[str, ...] = ()
+     catalog_matches: tuple[CatalogMatch, ...] = ()
++    catalog_lineage_ref: ArtifactRef | None = None
+     research_plan: ResearchPlan | None = None
+ 
+     admission: ResearchAdmission
+diff --git a/agent/contracts/scanner.py b/agent/contracts/scanner.py
+index 99dad09..de52f01 100644
+--- a/agent/contracts/scanner.py
++++ b/agent/contracts/scanner.py
+@@ -4,9 +4,11 @@ from __future__ import annotations
+ 
+ from enum import StrEnum
+ 
+-from pydantic import Field
++from pydantic import Field, model_validator
+ 
+ from agent.contracts.common import ArtifactRef, ContractModel, Sha256
++from agent.contracts.host import ReceiptRef
++from agent.contracts.planning_coverage import PlanningCoverage
+ 
+ 
+ class ScannerOutcome(StrEnum):
+@@ -34,6 +36,17 @@ class ScannerRequest(ContractModel):
+     repository_source: str = Field(min_length=1)
+     requested_capabilities: tuple[str, ...] = Field(min_length=1)
+ 
++    @model_validator(mode="after")
++    def exact_candidate_binding(self) -> ScannerRequest:
++        if (
++            self.candidate_artifact.artifact_revision != self.specification_revision
++            or self.candidate_artifact.artifact_digest != self.specification_digest
++        ):
++            raise ValueError("Scanner request does not bind the exact candidate")
++        if len(set(self.requested_capabilities)) != len(self.requested_capabilities):
++            raise ValueError("duplicate Scanner capability")
++        return self
++
+ 
+ class ScannerFinding(ContractModel):
+     finding_id: str = Field(min_length=1)
+@@ -46,6 +59,8 @@ class ScannerFinding(ContractModel):
+ 
+ class ScannerResult(ContractModel):
+     request_id: str = Field(min_length=1)
++    task_id: str = ""
++    run_id: str = ""
+     outcome: ScannerOutcome
+     capabilities_checked: tuple[str, ...] = ()
+     capabilities_not_checked: tuple[str, ...] = ()
+@@ -53,3 +68,15 @@ class ScannerResult(ContractModel):
+     findings_artifact_id: str | None = None
+     findings_artifact_digest: Sha256 | None = None
+     limitation_reasons: tuple[str, ...] = ()
++    candidate_ref: ArtifactRef | None = None
++    repository_identity: str = ""
++    requested_capabilities: tuple[str, ...] = ()
++    registry_ref: ArtifactRef | None = None
++    planning_coverage: PlanningCoverage | None = None
++
++
++class ScannerEvidence(ContractModel):
++    """Host-persisted scan result and trusted receipt for an exact candidate."""
++
++    result_ref: ArtifactRef
++    receipt_ref: ReceiptRef
+diff --git a/agent/contracts/tool_registry.py b/agent/contracts/tool_registry.py
+index 21309cc..5a30918 100644
+--- a/agent/contracts/tool_registry.py
++++ b/agent/contracts/tool_registry.py
+@@ -18,7 +18,6 @@ StageId = Literal[
+     "planning",
+     "fixture_validation",
+     "build",
+-    "build_validation",
+ ]
+ _PLACEHOLDER = re.compile(r"^\{([a-z][a-z0-9_-]*)\}$")
+ _DRIVE = re.compile(r"^[A-Za-z]:")
+diff --git a/agent/contracts/validation/structural.py b/agent/contracts/validation/structural.py
+index 844ed65..238609c 100644
+--- a/agent/contracts/validation/structural.py
++++ b/agent/contracts/validation/structural.py
+@@ -176,7 +176,7 @@ def tool_invocation_gaps(
+     spec: BuildSpecification,
+     registry: ToolRegistrySnapshot | None,
+     *,
+-    stage: Literal["build", "build_validation"] = "build",
++    stage: Literal["build"] = "build",
+ ) -> list[str]:
+     """No executable verification without a pinned catalog and resolvable tools."""
+     pending = [action for action in spec.actions if action.verification_tools]
+diff --git a/agent/contracts/work_todo.py b/agent/contracts/work_todo.py
+index aa985b9..739e0f6 100644
+--- a/agent/contracts/work_todo.py
++++ b/agent/contracts/work_todo.py
+@@ -13,7 +13,7 @@ from pydantic import Field, model_validator
+ 
+ from agent.contracts.common import ArtifactRef, ContractModel
+ 
+-StageId = Literal["research", "audit_discovery", "planning", "fixture_validation", "build", "build_validation"]
++StageId = Literal["research", "audit_discovery", "planning", "fixture_validation", "build"]
+ 
+ 
+ class WorkStatus(StrEnum):
+diff --git a/agent/research_catalog.py b/agent/research_catalog.py
+index 85de5c5..31f8dcb 100644
+--- a/agent/research_catalog.py
++++ b/agent/research_catalog.py
+@@ -8,11 +8,14 @@ synthetic with no factual authority.
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass
++from hashlib import sha256
+ from pathlib import Path
+ from typing import Any
+ 
+ import yaml
++from pydantic import Field
+ 
++from agent.contracts.common import ContractModel, Sha256
+ from agent.contracts.research import (
+     CatalogMatch,
+     CatalogMatchStatus,
+@@ -35,6 +38,17 @@ class CatalogSample:
+     is_synthetic: bool = True
+ 
+ 
++class CatalogLineage(ContractModel):
++    """Exact synthetic catalog source bound to one admitted Research input."""
++
++    input_id: str = Field(min_length=1)
++    catalog_id: str = Field(min_length=1)
++    catalog_version: str = Field(min_length=1)
++    match_status: CatalogMatchStatus
++    source_digest: Sha256
++    is_synthetic: bool = True
++
++
+ class ResearchCatalog:
+     """Versioned synthetic catalog with deterministic matching.
+ 
+@@ -113,6 +127,24 @@ class ResearchCatalog:
+             self.load()
+         return tuple(s.catalog_id for s in self._samples)
+ 
++    def lineage_for(self, input_id: str, match: CatalogMatch) -> CatalogLineage:
++        """Bind a match to the current catalog bytes without promoting it to evidence."""
++        if not self._loaded:
++            self.load()
++        if not match.is_synthetic or match.catalog_id not in {*self.sample_ids, "NONE", "AMBIGUOUS"}:
++            raise ValueError("catalog match is not from the loaded synthetic catalog")
++        if match.catalog_id not in {"NONE", "AMBIGUOUS"}:
++            sample = self.get_sample(match.catalog_id)
++            if sample is None or sample.version != match.catalog_version:
++                raise ValueError("catalog version changed before lineage capture")
++        return CatalogLineage(
++            input_id=input_id,
++            catalog_id=match.catalog_id,
++            catalog_version=match.catalog_version,
++            match_status=match.match_status,
++            source_digest=sha256(self._samples_path.read_bytes()).hexdigest(),
++        )
++
+     def match(
+         self,
+         intent: ResearchIntent,
+diff --git a/agent/runtime/build_admission.py b/agent/runtime/build_admission.py
+index fdc15e9..dd4964a 100644
+--- a/agent/runtime/build_admission.py
++++ b/agent/runtime/build_admission.py
+@@ -2,12 +2,14 @@
+ 
+ from __future__ import annotations
+ 
++from agent.contracts.common import ArtifactRef
+ from agent.contracts.host import BuildAdmissionReceipt, PackageLockReceipt, ReceiptRef, admission_receipt_subject
+ from agent.contracts.planning import BuildSpecification, CandidateSpecification, PlanningRecord
+ from agent.contracts.validation.structural import tool_invocation_gaps
+ from agent.runtime.artifact_store import ArtifactStore
+ from agent.runtime.canonical_serialization import digest_raw
+ from agent.runtime.receipt_store import ReceiptStore
++from agent.runtime.recovery_readiness import verify_recovery_readiness
+ from agent.runtime.tool_registry import load_pinned_tool_registry
+ 
+ 
+@@ -50,7 +52,7 @@ class BuildAdmission:
+         lock_receipt_ref: ReceiptRef,
+         authorized_action_ids: tuple[str, ...],
+         lock_subject: str,
+-        recovery_readiness_ref: str | None = None,
++        recovery_readiness_ref: ArtifactRef | None = None,
+         issuer_id: str = "host",
+         *,
+         build_spec: BuildSpecification | None = None,
+@@ -96,6 +98,12 @@ class BuildAdmission:
+             if any(action_id not in action_map for action_id in authorized_action_ids):
+                 raise BuildAdmissionError("admission contains unknown action ids")
+             actions = tuple(action_map[action_id] for action_id in authorized_action_ids)
++            if recovery_readiness_ref is None:
++                raise BuildAdmissionError("verified recovery readiness required for frozen Build")
++            try:
++                verify_recovery_readiness(self._artifacts, recovery_readiness_ref)
++            except (ValueError, LookupError) as exc:
++                raise BuildAdmissionError("recovery readiness evidence unavailable") from exc
+             invocations = tuple(inv for action in actions for inv in action.verification_tools)
+             if invocations:
+                 if registry_ref is None:
+@@ -111,7 +119,9 @@ class BuildAdmission:
+                 authorized_tools = tuple(sorted({inv.tool_id for inv in invocations}))
+ 
+         receipt_id = f"admission-{admission_id}"
+-        subject = admission_receipt_subject(lock_receipt_ref, authorized_action_ids, authorized_tools, registry_ref)
++        subject = admission_receipt_subject(
++            lock_receipt_ref, authorized_action_ids, authorized_tools, registry_ref, recovery_readiness_ref
++        )
+         _, receipt_digest = self._receipts.issue_verified(receipt_id, issuer_id, subject)
+         return BuildAdmissionReceipt(
+             admission_id=admission_id,
+diff --git a/agent/runtime/build_todos.py b/agent/runtime/build_todos.py
+index 09b013e..d53147f 100644
+--- a/agent/runtime/build_todos.py
++++ b/agent/runtime/build_todos.py
+@@ -2,7 +2,9 @@
+ 
+ from __future__ import annotations
+ 
++from agent.contracts.build_schedule import BuildBatch, BuildTask, BuildWave
+ from agent.contracts.common import ArtifactRef
++from agent.contracts.host import ReceiptRef
+ from agent.contracts.planning import (
+     BuildAction,
+     BuildSpecification,
+@@ -89,3 +91,27 @@ def compile_build(spec: BuildSpecification, frozen_plan_ref: ArtifactRef) -> Bui
+         todos=todos,
+         waves=tuple(waves),
+     )
++
++
++def compile_build_wave(
++    build: Build,
++    wave_index: int,
++    observed_preimages: dict[str, str | None],
++    previous_wave_result_ref: ArtifactRef | None = None,
++    previous_wave_receipt_ref: ReceiptRef | None = None,
++) -> BuildWave:
++    """Bind an admitted wave to the host's current preimage observations."""
++    if wave_index < 1 or wave_index > len(build.waves):
++        raise ValueError("unknown Build wave")
++    todos = {todo.todo_id: todo for todo in build.todos}
++    selected = build.waves[wave_index - 1]
++    tasks = tuple(BuildTask(task_id=todo_id, todo=todos[todo_id]) for todo_id in selected)
++    batch = BuildBatch(batch_id=f"{build.build_id}:batch:{wave_index}", tasks=tasks)
++    return BuildWave(
++        wave_id=f"{build.build_id}:wave:{wave_index}",
++        wave_index=wave_index,
++        batches=(batch,),
++        expected_preimages=observed_preimages,
++        previous_wave_result_ref=previous_wave_result_ref,
++        previous_wave_receipt_ref=previous_wave_receipt_ref,
++    )
+diff --git a/agent/runtime/checkpoint_store.py b/agent/runtime/checkpoint_store.py
+index 80237e2..c8f2724 100644
+--- a/agent/runtime/checkpoint_store.py
++++ b/agent/runtime/checkpoint_store.py
+@@ -23,6 +23,14 @@ class StaleCheckpointError(CheckpointStoreError):
+     """Raised when a checkpoint write conflicts with an existing revision."""
+ 
+ 
++def require_next_revision(current: int, expected_previous: int, revision: int) -> None:
++    """Apply the shared Checkpoint model CAS rule before either store writes."""
++    if expected_previous != current:
++        raise StaleCheckpointError(f"Expected {expected_previous}, found {current}")
++    if revision != current + 1:
++        raise StaleCheckpointError("Revision must increase by one")
++
++
+ class InMemoryCheckpointStore:
+     """In-memory checkpoint store with CAS semantics for testing."""
+ 
+@@ -36,10 +44,7 @@ class InMemoryCheckpointStore:
+         revision = checkpoint.checkpoint_revision
+         existing = self._store.get(cid)
+         current = 0 if existing is None else existing.checkpoint_revision
+-        if expected != current:
+-            raise StaleCheckpointError(f"Expected {expected}, found {current}")
+-        if revision != current + 1:
+-            raise StaleCheckpointError("Revision must increase by one")
++        require_next_revision(current, expected, revision)
+         self._store[cid] = checkpoint
+ 
+     def get(self, checkpoint_id: str) -> Checkpoint | None:
+diff --git a/agent/runtime/controller.py b/agent/runtime/controller.py
+index e320695..a105c21 100644
+--- a/agent/runtime/controller.py
++++ b/agent/runtime/controller.py
+@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
+ 
+ from agent.contracts.common import ArtifactRef
+ from agent.contracts.host import HostDispatchEnvelope, HostDispatchResult, ReceiptRef
+-from agent.contracts.scanner import ScannerResult
++from agent.contracts.scanner import ScannerEvidence
+ from agent.contracts.work_todo import TodoList, WorkBinding
+ from agent.runtime.artifact_store import ArtifactStore
+ from agent.runtime.authorization import AuthorizationEngine
+@@ -24,11 +24,13 @@ from agent.runtime.host_gap_analyzer import (
+     StructuralGapOutcome,
+     StructuralGapRequest,
+     StructuralGapResult,
+-    structural_gap_receipt_subject,
++    verify_structural_pass,
+ )
+ from agent.runtime.providers.registry import ProviderRegistry
+ from agent.runtime.receipt_store import ReceiptStore
+ from agent.runtime.recovery import BoundedRecovery
++from agent.runtime.scanner_check_registry import ScannerCheckRegistry
++from agent.runtime.scanner_evidence import ScannerScanOutcome, persist_scan_result, verify_scanner_evidence
+ from agent.runtime.scanner_gateway import ScannerGateway
+ from agent.runtime.work_todo import WorkTodoError, WorkTodoManager
+ 
+@@ -39,7 +41,6 @@ class Stage(StrEnum):
+     PLANNING = "planning"
+     FIXTURE_VALIDATION = "fixture_validation"
+     BUILD = "build"
+-    BUILD_VALIDATION = "build_validation"
+ 
+ 
+ STAGE_ORDER = (
+@@ -48,7 +49,6 @@ STAGE_ORDER = (
+     Stage.PLANNING,
+     Stage.FIXTURE_VALIDATION,
+     Stage.BUILD,
+-    Stage.BUILD_VALIDATION,
+ )
+ 
+ 
+@@ -62,6 +62,9 @@ class TaskState(BaseModel):
+     current_stage: Stage = Stage.RESEARCH
+     completed_stages: tuple[Stage, ...] = ()
+     active_work_artifact_id: str | None = None
++    build_verification_artifact_id: str | None = None
++    build_verification_digest: str | None = None
++    planning_revision: int = Field(default=1, ge=1)
+ 
+     model_config = {"frozen": True}
+ 
+@@ -88,6 +91,7 @@ class HostController:
+         self.work_todos = WorkTodoManager(self.artifact_store, self.event_store)
+         self.checkpoint_store = CheckpointStore(self.state_root)
+         self.scanner = ScannerGateway(self.artifact_store)
++        self.scanner_checks: ScannerCheckRegistry | None = None
+         self.gap_analyzer = HostGapAnalyzer(self.artifact_store, self.receipt_store)
+         self.recovery = BoundedRecovery()
+         self.providers = ProviderRegistry()
+@@ -106,6 +110,7 @@ class HostController:
+         completion_receipt_ref: ReceiptRef | None = None,
+         gap_result_ref: ArtifactRef | None = None,
+         gap_receipt_ref: ReceiptRef | None = None,
++        scanner_evidence: ScannerEvidence | None = None,
+         todo_ref: ArtifactRef | None = None,
+     ) -> TaskState:
+         """Advance to the next stage if the current stage is completed.
+@@ -127,7 +132,8 @@ class HostController:
+ 
+         receipt_artifact = self._verify_stage_receipt(state, completion_receipt_ref)
+         if state.current_stage is Stage.PLANNING:
+-            self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref)
++            gap_result = self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref)
++            self._verify_scanner_pass(task_id, run_id, gap_result.candidate_specification_ref, scanner_evidence)
+ 
+         # Task tracking is a mandatory observation gate, never permission to execute.
+         if todo_ref is None:
+@@ -151,6 +157,7 @@ class HostController:
+             run_id=run_id,
+             current_stage=new_stage,
+             completed_stages=completed,
++            planning_revision=state.planning_revision,
+         )
+ 
+         expected_rev = checkpoint[0] if checkpoint else 0
+@@ -163,7 +170,12 @@ class HostController:
+         except CompetingWriterError as e:
+             raise TransitionError(f"checkpoint CAS failed: {e}") from e
+ 
+-        self.event_store.append(task_id, "stage_transition", f"{state.current_stage} -> {new_stage}")
++        self.event_store.append(
++            task_id,
++            "stage_transition",
++            f"{state.current_stage} -> {new_stage}",
++            event_id=f"stage-transition:{task_id}:{run_id}:{expected_rev + 1}",
++        )
+         return new_state
+ 
+     def _verify_stage_receipt(self, state: TaskState, completion_receipt_ref: ReceiptRef | None) -> ArtifactRef:
+@@ -234,36 +246,58 @@ class HostController:
+         """Verify a persisted result and trusted pass receipt for this exact candidate."""
+         if gap_result_ref is None or gap_receipt_ref is None:
+             raise TransitionError("structural gap analysis receipt and result required")
+-        if gap_receipt_ref.issuer_id != "host":
+-            raise TransitionError("untrusted structural gap completion issuer")
+         try:
+-            digest = self.artifact_store.get_digest(gap_result_ref.artifact_id, gap_result_ref.artifact_revision)
+-            if digest != gap_result_ref.artifact_digest:
+-                raise ValueError("structural gap artifact digest mismatch")
+-            if gap_result_ref.contract_id != "structural_analysis_result":
+-                raise ValueError("incorrect structural gap result contract")
+-            raw = self.artifact_store.get_verified(gap_result_ref.artifact_id, gap_result_ref.artifact_revision)
+-            result = StructuralGapResult.model_validate_json(raw)
+-            if result.task_id != task_id or result.run_id != run_id:
+-                raise ValueError("structural gap result belongs to another task or run")
+-            if result.execution_status != "completed" or result.findings:
+-                raise ValueError("structural gap analysis did not pass")
+-            if result.known_critical_gap_detection_rate != 1.0 or not result.walking_skeleton_completed:
+-                raise ValueError("structural gap backtest or walking skeleton incomplete")
+-            candidate = result.candidate_specification_ref
+-            if (
+-                self.artifact_store.get_digest(candidate.artifact_id, candidate.artifact_revision)
+-                != candidate.artifact_digest
+-            ):
+-                raise ValueError("Planning candidate changed since structural analysis")
+-            subject = structural_gap_receipt_subject(result, digest)
+-            if not self.receipt_store.verify(gap_receipt_ref.receipt_id, gap_receipt_ref.receipt_digest, subject):
+-                raise ValueError("structural gap completion receipt is not verified")
++            return verify_structural_pass(
++                self.artifact_store,
++                self.receipt_store,
++                task_id,
++                run_id,
++                gap_result_ref,
++                gap_receipt_ref,
++                candidate_ref,
++            )
+         except Exception as exc:
+             raise TransitionError(f"invalid structural gap evidence: {exc}") from exc
+-        if candidate_ref is not None and result.candidate_specification_ref != candidate_ref:
+-            raise TransitionError("structural gap pass belongs to a different candidate")
+-        return result
++
++    def configure_scanner_checks(self, registry_ref: ArtifactRef) -> None:
++        """Load exact host-pinned check requirements; missing tools fail closed."""
++        self.scanner_checks = ScannerCheckRegistry(self.artifact_store, registry_ref)
++
++    def planning_ready_for_approval(
++        self,
++        task_id: str,
++        run_id: str,
++        candidate_ref: ArtifactRef,
++        gap_result_ref: ArtifactRef | None,
++        gap_receipt_ref: ReceiptRef | None,
++        scanner_evidence: ScannerEvidence | None,
++    ) -> bool:
++        """Read-only host gate for the exact proposed Planning candidate."""
++        self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
++        self._verify_scanner_pass(task_id, run_id, candidate_ref, scanner_evidence)
++        return True
++
++    def _verify_scanner_pass(
++        self,
++        task_id: str,
++        run_id: str,
++        candidate_ref: ArtifactRef,
++        evidence: ScannerEvidence | None,
++    ) -> None:
++        if self.scanner_checks is None or evidence is None:
++            raise TransitionError("verified Scanner coverage required for Planning")
++        try:
++            verify_scanner_evidence(
++                self.artifact_store,
++                self.receipt_store,
++                evidence,
++                candidate_ref,
++                self.scanner_checks,
++                task_id,
++                run_id,
++            )
++        except Exception as exc:
++            raise TransitionError(f"invalid Scanner evidence: {exc}") from exc
+ 
+     def scan_planning_candidate(
+         self,
+@@ -274,10 +308,31 @@ class HostController:
+         capabilities: tuple[str, ...],
+         gap_result_ref: ArtifactRef | None,
+         gap_receipt_ref: ReceiptRef | None,
+-    ) -> ScannerResult:
++    ) -> ScannerScanOutcome:
+         """Host Scanner dispatch; always reject an unvalidated Planning candidate."""
+         self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
+-        return self.scanner.scan_exact(candidate_ref, repository_identity, capabilities)
++        if self.scanner_checks is None:
++            raise TransitionError("Scanner check registry is not configured")
++        if not repository_identity:
++            raise TransitionError("Scanner repository identity is required")
++        required_capabilities = self.scanner_checks.required_capabilities
++        if capabilities != required_capabilities:
++            raise TransitionError("Scanner request does not cover the required registry checks")
++        result = self.scanner.scan_exact(
++            candidate_ref, repository_identity, required_capabilities, self.scanner_checks.ref
++        ).model_copy(update={"task_id": task_id, "run_id": run_id})
++        from agent.contracts.planning_coverage import planning_coverage
++        from agent.contracts.validation.structural import CONCERNS
++
++        result = result.model_copy(
++            update={
++                "planning_coverage": planning_coverage(
++                    structural_concerns=CONCERNS,
++                    scanner_capabilities=result.capabilities_checked,
++                )
++            }
++        )
++        return persist_scan_result(self.artifact_store, self.receipt_store, result, self.scanner_checks)
+ 
+     def run_structural_gap_analysis(
+         self,
+@@ -295,7 +350,7 @@ class HostController:
+         completion_receipt_ref: ReceiptRef | None,
+         todo_ref: ArtifactRef | None,
+     ) -> TaskState:
+-        """Mark Build Verification completed only after its assigned work is verified."""
++        """Complete Build only after independent verification and assigned work pass."""
+         checkpoint = self.checkpoint_store.load_checkpoint(task_id)
+         if checkpoint is None:
+             raise TransitionError("task has no checkpoint")
+@@ -303,9 +358,10 @@ class HostController:
+         state = TaskState(**state_dict)
+         if state.run_id != run_id or state.task_id != task_id:
+             raise TransitionError("final stage task/run mismatch")
+-        if state.current_stage is not Stage.BUILD_VALIDATION or Stage.BUILD_VALIDATION in state.completed_stages:
+-            raise TransitionError("task is not at an unfinished final verification stage")
++        if state.current_stage is not Stage.BUILD or Stage.BUILD in state.completed_stages:
++            raise TransitionError("task is not at an unfinished Build stage")
+         receipt_artifact = self._verify_stage_receipt(state, completion_receipt_ref)
++        self._verify_final_build_evidence(state, receipt_artifact)
+         if todo_ref is None:
+             raise TransitionError("completed final-stage work list required")
+         if state.active_work_artifact_id != todo_ref.artifact_id:
+@@ -317,7 +373,7 @@ class HostController:
+         self._verify_stage_evidence(receipt_artifact, todo_ref)
+         completed = state.model_copy(
+             update={
+-                "completed_stages": (*state.completed_stages, Stage.BUILD_VALIDATION),
++                "completed_stages": (*state.completed_stages, Stage.BUILD),
+                 "active_work_artifact_id": None,
+             }
+         )
+@@ -325,18 +381,139 @@ class HostController:
+             self.checkpoint_store.checkpoint_cas(task_id, revision, completed.model_dump(mode="json"))
+         except CompetingWriterError as exc:
+             raise TransitionError(f"final stage checkpoint CAS failed: {exc}") from exc
+-        self.event_store.append(task_id, "stage_completed", Stage.BUILD_VALIDATION.value)
++        self.event_store.append(
++            task_id,
++            "stage_completed",
++            Stage.BUILD.value,
++            event_id=f"stage-completed:{task_id}:{run_id}:{revision + 1}",
++        )
+         return completed
+ 
+-    def _declared_dispatch_role(self, stage: Stage) -> str:
++    def route_validation_rework(self, task_id: str, run_id: str, validation_ref: ArtifactRef) -> ArtifactRef:
++        """Return failed verifier observations to a new Planning revision."""
++        from agent.contracts.build_validation import BuildValidationRecord, PlanningReworkInput
++
++        checkpoint = self.checkpoint_store.load_checkpoint(task_id)
++        if checkpoint is None:
++            raise TransitionError("task has no checkpoint for validation rework")
++        revision, state_dict, _ = checkpoint
++        state = TaskState(**state_dict)
++        if (state.task_id, state.run_id) != (task_id, run_id) or state.current_stage is not Stage.BUILD:
++            raise TransitionError("validation rework requires an active Build task")
++        if Stage.BUILD in state.completed_stages:
++            raise TransitionError("completed Build cannot be routed to Planning")
++        if validation_ref.contract_id != "build_validation_record":
++            raise TransitionError("wrong validation record contract")
++        if (
++            state.build_verification_artifact_id != validation_ref.artifact_id
++            or state.build_verification_digest != validation_ref.artifact_digest
++        ):
++            raise TransitionError("validation record was not received from the host-dispatched verifier")
++        if (
++            self.artifact_store.get_digest(validation_ref.artifact_id, validation_ref.artifact_revision)
++            != validation_ref.artifact_digest
++        ):
++            raise TransitionError("validation record digest mismatch")
++        record = BuildValidationRecord.model_validate_json(
++            self.artifact_store.get_verified(validation_ref.artifact_id, validation_ref.artifact_revision)
++        )
++        if (record.task_id, record.run_id) != (task_id, run_id):
++            raise TransitionError("validation record belongs to another task or run")
++        issues = record.planning_issue_inputs()
++        if not issues:
++            raise TransitionError("no failed validation observations for Planning")
++        next_revision = state.planning_revision + 1
++        rework = PlanningReworkInput(
++            task_id=task_id,
++            run_id=run_id,
++            planning_revision=next_revision,
++            validation_ref=validation_ref,
++            issue_sources=issues,
++        )
++        artifact_id = f"planning-rework:{task_id}:{run_id}:{next_revision}"
++        digest = self.artifact_store.put_immutable(rework, artifact_id, 1, "planning_rework_input", "1.0")
++        updated = state.model_copy(
++            update={
++                "current_stage": Stage.PLANNING,
++                "completed_stages": tuple(
++                    stage for stage in state.completed_stages if stage in {Stage.RESEARCH, Stage.AUDIT_DISCOVERY}
++                ),
++                "active_work_artifact_id": None,
++                "build_verification_artifact_id": None,
++                "build_verification_digest": None,
++                "planning_revision": next_revision,
++            }
++        )
++        try:
++            self.checkpoint_store.checkpoint_cas(task_id, revision, updated.model_dump(mode="json"))
++        except CompetingWriterError as exc:
++            raise TransitionError("validation rework checkpoint conflict") from exc
++        self.event_store.append(
++            task_id,
++            "validation_rework_requested",
++            artifact_id,
++            event_id=f"validation-rework:{task_id}:{run_id}:{next_revision}",
++        )
++        return ArtifactRef(
++            artifact_id=artifact_id,
++            artifact_revision=1,
++            artifact_digest=digest,
++            contract_id="planning_rework_input",
++            contract_version="1.0",
++            serializer_profile=SERIALIZER_PROFILE,
++        )
++
++    def _verify_final_build_evidence(self, state: TaskState, artifact: ArtifactRef) -> None:
++        """Require a passing independent verifier record bound to an actual Build record."""
++        from agent.contracts.build import BuildRecord
++        from agent.contracts.build_validation import BuildValidationRecord, CriterionResult
++
++        try:
++            raw = self.artifact_store.get_verified(artifact.artifact_id, artifact.artifact_revision)
++            verification = BuildValidationRecord.model_validate_json(raw)
++            if (verification.task_id, verification.run_id) != (state.task_id, state.run_id):
++                raise ValueError("verification belongs to another task or run")
++            if (
++                state.build_verification_artifact_id != artifact.artifact_id
++                or state.build_verification_digest != artifact.artifact_digest
++            ):
++                raise ValueError("verification was not received from the host-dispatched verifier")
++            if not verification.criterion_results or not verification.e2e_results:
++                raise ValueError("independent verification observations required")
++            if any(item.outcome is not CriterionResult.VALID for item in verification.criterion_results):
++                raise ValueError("acceptance criterion did not pass")
++            if any(
++                item.outcome is not CriterionResult.VALID or item.exit_code != 0 for item in verification.e2e_results
++            ):
++                raise ValueError("end-to-end verification did not pass")
++            build_ref = verification.build_ref
++            if build_ref.contract_id != "build_record":
++                raise ValueError("verification does not cite a Build record")
++            if (
++                self.artifact_store.get_digest(build_ref.artifact_id, build_ref.artifact_revision)
++                != build_ref.artifact_digest
++            ):
++                raise ValueError("Build record digest mismatch")
++            build = BuildRecord.model_validate_json(
++                self.artifact_store.get_verified(build_ref.artifact_id, build_ref.artifact_revision)
++            )
++            if (build.task_id, build.run_id) != (state.task_id, state.run_id):
++                raise ValueError("Build record belongs to another task or run")
++        except Exception as exc:
++            raise TransitionError("final Build requires passing independent verification evidence") from exc
++
++    def _declared_dispatch_role(self, stage: Stage, requested_role: str | None = None) -> str:
+         """Resolve the single workflow-owned stage role, rejecting missing configuration."""
+         config_path = Path(__file__).resolve().parents[2] / ".agents" / "contracts" / "workflow.yaml"
+         try:
+             config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+             bundle = config["bundle"]
+             declared = config["role_workflows"][stage.value]
+-            role = declared["workflow"]["role_id"]
+-            stage_id = declared["workflow"]["stage_id"]
++            workflow = declared["workflow"]
++            if stage is Stage.BUILD and requested_role == "build_verifier":
++                workflow = workflow["independent_verification"]["workflow"]
++            role = workflow["role_id"]
++            stage_id = workflow["stage_id"]
+         except (OSError, KeyError, TypeError, ValueError, AttributeError) as exc:
+             raise TransitionError("registered workflow role unavailable") from exc
+         if bundle.get("transition_owner") != "host_controller" or stage_id != stage.value or not isinstance(role, str):
+@@ -373,7 +550,7 @@ class HostController:
+         if state is None or not information_needed.strip():
+             raise TransitionError("dispatch requires an initialized task and nonempty objective")
+         stage = state.current_stage
+-        role = self._declared_dispatch_role(stage)
++        role = self._declared_dispatch_role(stage, requested_role)
+         if requested_role is not None and requested_role != role:
+             self.event_store.append(
+                 task_id, "agent_dispatch_rejected", f"stage={stage.value};requested={requested_role};allowed={role}"
+@@ -399,6 +576,7 @@ class HostController:
+         fingerprint = sha256(
+             (
+                 f"{task_id}:{state.run_id}:{stage.value}:"
++                f"{'build_verifier:' if role == 'build_verifier' else ''}"
+                 f"{input_request_ref.artifact_id}:{input_request_ref.artifact_revision}:"
+                 f"{input_request_ref.artifact_digest}:{information_needed.strip()}"
+             ).encode()
+@@ -438,7 +616,12 @@ class HostController:
+             action=action or information_needed.strip(),
+             expected_result=expected_result or f"Verified {role} output persisted by host",
+         )
+-        self.event_store.append(task_id, "agent_dispatch_prepared", f"{stage.value}:{role}:{request_id}")
++        self.event_store.append(
++            task_id,
++            "agent_dispatch_prepared",
++            f"{stage.value}:{role}:{request_id}",
++            event_id=f"dispatch:{task_id}:{state.run_id}:{request_id}",
++        )
+         return envelope, self._dispatch_ref(envelope, digest), todo_ref
+ 
+     def verify_agent_dispatch(self, envelope: HostDispatchEnvelope) -> None:
+@@ -446,7 +629,7 @@ class HostController:
+         state = self.get_state(envelope.task_id)
+         if state is None or state.run_id != envelope.run_id or state.current_stage.value != envelope.stage:
+             raise TransitionError("stale or mismatched agent dispatch stage identity")
+-        if self._declared_dispatch_role(state.current_stage) != envelope.role:
++        if self._declared_dispatch_role(state.current_stage, envelope.role) != envelope.role:
+             raise TransitionError("agent dispatch targets unauthorized role")
+         aid = f"agent-dispatch:{envelope.request_id}"
+         try:
+@@ -497,9 +680,12 @@ class HostController:
+                 Stage.PLANNING: ("planning_record", PlanningRecord),
+                 Stage.FIXTURE_VALIDATION: ("fixture_validation_record", FixtureValidationRecord),
+                 Stage.BUILD: ("build_record", BuildRecord),
+-                Stage.BUILD_VALIDATION: ("build_validation_record", BuildValidationRecord),
+             }
+-            required_contract, contract_model = contracts[Stage(envelope.stage)]
++            required_contract, contract_model = (
++                ("build_validation_record", BuildValidationRecord)
++                if envelope.stage == Stage.BUILD.value and envelope.role == "build_verifier"
++                else contracts[Stage(envelope.stage)]
++            )
+             if output.contract_id != required_contract:
+                 raise ValueError("agent result contract belongs to another stage")
+             verified_record = contract_model.model_validate_json(raw)
+@@ -508,7 +694,7 @@ class HostController:
+                 envelope.run_id,
+             ):
+                 raise ValueError("agent result task/run identity mismatch")
+-            if Stage(envelope.stage) is Stage.BUILD:
++            if Stage(envelope.stage) is Stage.BUILD and envelope.role == "builder":
+                 from agent.contracts.host import BuildAdmissionReceipt, PackageLockReceipt, admission_receipt_subject
+ 
+                 build = BuildRecord.model_validate(verified_record)
+@@ -536,6 +722,7 @@ class HostController:
+                     admission.authorized_action_ids,
+                     admission.authorized_tool_ids,
+                     admission.tool_registry_ref,
++                    admission.recovery_readiness_ref,
+                 )
+                 if not self.receipt_store.verify(
+                     admission.receipt_ref.receipt_id, admission.receipt_ref.receipt_digest, subject
+@@ -552,7 +739,30 @@ class HostController:
+             )
+         except Exception as exc:
+             raise TransitionError("agent return is conflicting or unpersisted") from exc
+-        self.event_store.append(envelope.task_id, "agent_result_received", f"{envelope.respond_to}:{aid}")
++        self.event_store.append(
++            envelope.task_id,
++            "agent_result_received",
++            f"{envelope.respond_to}:{aid}",
++            event_id=f"agent-result:{envelope.task_id}:{envelope.request_id}:{aid}",
++        )
++        if envelope.stage == Stage.BUILD.value and envelope.role == "build_verifier":
++            checkpoint = self.checkpoint_store.load_checkpoint(envelope.task_id)
++            if checkpoint is None:
++                raise TransitionError("verifier result has no active checkpoint")
++            revision, state_dict, _ = checkpoint
++            state = TaskState(**state_dict)
++            if state.current_stage is not Stage.BUILD or Stage.BUILD in state.completed_stages:
++                raise TransitionError("verifier result arrived outside active Build")
++            updated = state.model_copy(
++                update={
++                    "build_verification_artifact_id": output.artifact_id,
++                    "build_verification_digest": output.artifact_digest,
++                }
++            )
++            try:
++                self.checkpoint_store.checkpoint_cas(envelope.task_id, revision, updated.model_dump(mode="json"))
++            except CompetingWriterError as exc:
++                raise TransitionError(f"verifier result checkpoint conflict: {exc}") from exc
+         return ArtifactRef(
+             artifact_id=aid,
+             artifact_revision=envelope.request_revision,
+@@ -592,7 +802,12 @@ class HostController:
+                 self.checkpoint_store.checkpoint_cas(binding.task_id, revision, updated.model_dump(mode="json"))
+             except CompetingWriterError as exc:
+                 raise TransitionError(f"concurrent work assignment: {exc}") from exc
+-            self.event_store.append(binding.task_id, "work_assigned", ref.artifact_id)
++            self.event_store.append(
++                binding.task_id,
++                "work_assigned",
++                ref.artifact_id,
++                event_id=f"work-assigned:{binding.task_id}:{ref.artifact_id}:{ref.artifact_revision}",
++            )
+         return record, ref
+ 
+     def finish_capability_work(
+@@ -621,7 +836,12 @@ class HostController:
+             self.checkpoint_store.checkpoint_cas(task_id, revision, updated.model_dump(mode="json"))
+         except CompetingWriterError as exc:
+             raise TransitionError(f"capability work checkpoint conflict: {exc}") from exc
+-        self.event_store.append(task_id, "capability_work_completed", todo_ref.artifact_id)
++        self.event_store.append(
++            task_id,
++            "capability_work_completed",
++            todo_ref.artifact_id,
++            event_id=f"capability-work-completed:{task_id}:{todo_ref.artifact_id}:{todo_ref.artifact_revision}",
++        )
+         return updated
+ 
+     def get_state(self, task_id: str) -> TaskState | None:
+@@ -636,7 +856,7 @@ class HostController:
+         """Initialize a new task."""
+         state = TaskState(task_id=task_id, run_id=run_id)
+         self.checkpoint_store.checkpoint_cas(task_id, 0, state.model_dump(mode="json"))
+-        self.event_store.append(task_id, "task_init", f"run_id={run_id}")
++        self.event_store.append(task_id, "task_init", f"run_id={run_id}", event_id=f"task-init:{task_id}:{run_id}")
+         return state
+ 
+     def issue_stage_receipt(
+diff --git a/agent/runtime/durable_checkpoint_store.py b/agent/runtime/durable_checkpoint_store.py
+index 8449ff7..788f6d4 100644
+--- a/agent/runtime/durable_checkpoint_store.py
++++ b/agent/runtime/durable_checkpoint_store.py
+@@ -7,11 +7,8 @@ from pathlib import Path
+ 
+ from agent.contracts.host import Checkpoint
+ from agent.runtime.canonical_serialization import canonical_bytes
+-from agent.runtime.checkpoint_store import CheckpointStoreError
+-
+-
+-class StaleCheckpointError(CheckpointStoreError):
+-    """Raised when a checkpoint write conflicts with an existing revision."""
++from agent.runtime.checkpoint_store import StaleCheckpointError as StaleCheckpointError
++from agent.runtime.checkpoint_store import require_next_revision
+ 
+ 
+ class SQLiteCheckpointStore:
+@@ -42,10 +39,7 @@ class SQLiteCheckpointStore:
+                 (checkpoint.checkpoint_id,),
+             ).fetchone()
+             current = 0 if row is None else int(row[0])
+-            if checkpoint.expected_previous_revision != current:
+-                raise StaleCheckpointError(f"Expected {checkpoint.expected_previous_revision}, found {current}")
+-            if checkpoint.checkpoint_revision != current + 1:
+-                raise StaleCheckpointError("Revision must increase by one")
++            require_next_revision(current, checkpoint.expected_previous_revision, checkpoint.checkpoint_revision)
+             self.connection.execute(
+                 "INSERT INTO checkpoints(checkpoint_id, revision, payload) VALUES(?, ?, ?) "
+                 "ON CONFLICT(checkpoint_id) DO UPDATE SET revision=excluded.revision, "
+diff --git a/agent/runtime/effect_executor.py b/agent/runtime/effect_executor.py
+index d9bdbb8..ad70741 100644
+--- a/agent/runtime/effect_executor.py
++++ b/agent/runtime/effect_executor.py
+@@ -8,7 +8,9 @@ import tempfile
+ from pathlib import Path
+ 
+ from agent.contracts.build import BuildActionExecution, BuildActionStatus
++from agent.contracts.build_schedule import BuildWave, VerifiedWaveResult
+ from agent.contracts.host import BuildAdmissionReceipt, admission_receipt_subject
++from agent.runtime.artifact_store import ArtifactStore
+ from agent.runtime.authorization import AuthorizationEngine, AuthorizationError
+ from agent.runtime.checkpoint_store import CheckpointStore
+ from agent.runtime.receipt_store import ReceiptStore
+@@ -50,10 +52,12 @@ class EffectExecutor:
+         checkpoint_store: CheckpointStore,
+         receipt_store: ReceiptStore,
+         workspace_root: str | Path,
++        artifact_store: ArtifactStore | None = None,
+     ) -> None:
+         self._auth = authorization
+         self._checkpoints = checkpoint_store
+         self._receipts = receipt_store
++        self._artifacts = artifact_store
+         self._workspace = Path(os.path.realpath(str(workspace_root)))
+         self._workspace.mkdir(parents=True, exist_ok=True)
+ 
+@@ -103,6 +107,7 @@ class EffectExecutor:
+         file_path: str,
+         expected_pre: str | None,
+         expected_post: str | None,
++        target_path: str | None = None,
+     ) -> None:
+         """Write a durable pre-effect checkpoint to the checkpoint store."""
+         checkpoint_data = {
+@@ -111,6 +116,7 @@ class EffectExecutor:
+             "file_path": file_path,
+             "expected_pre_digest": expected_pre,
+             "expected_post_digest": expected_post,
++            "target_path": target_path,
+         }
+         self._checkpoints.checkpoint_cas(
+             f"pre-effect-{action_id}",
+@@ -150,6 +156,7 @@ class EffectExecutor:
+         source_path: str | None = None,
+         content: str | None = None,
+         expected_source_digest: str | None = None,
++        wave: BuildWave | None = None,
+     ) -> BuildActionExecution:
+         """Execute a single admitted build action.
+ 
+@@ -173,6 +180,7 @@ class EffectExecutor:
+                 admission_receipt.authorized_action_ids,
+                 admission_receipt.authorized_tool_ids,
+                 admission_receipt.tool_registry_ref,
++                admission_receipt.recovery_readiness_ref,
+             ),
+         ):
+             raise EffectExecutionError(f"invalid admission receipt for action {action_id}")
+@@ -201,6 +209,79 @@ class EffectExecutor:
+                     error=f"path escapes workspace (containment check failed): {source_path}",
+                 )
+ 
++        if wave is not None:
++            if wave.wave_index > 1:
++                previous = wave.previous_wave_result_ref
++                prior_receipt = wave.previous_wave_receipt_ref
++                if (
++                    previous is None
++                    or prior_receipt is None
++                    or self._artifacts is None
++                    or self._artifacts.get_digest(previous.artifact_id, previous.artifact_revision)
++                    != previous.artifact_digest
++                ):
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.BLOCKED,
++                        error="previous wave result is not verified",
++                    )
++                try:
++                    prior = VerifiedWaveResult.model_validate_json(
++                        self._artifacts.get_verified(previous.artifact_id, previous.artifact_revision)
++                    )
++                except Exception:
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.BLOCKED,
++                        error="previous wave result cannot be reopened",
++                    )
++                if (
++                    not prior.accepted
++                    or prior_receipt.issuer_id != "host"
++                    or not self._receipts.verify(
++                        prior_receipt.receipt_id,
++                        prior_receipt.receipt_digest,
++                        f"verified_wave:{previous.artifact_digest}",
++                    )
++                    or any(
++                        path not in prior.output_digests or prior.output_digests[path] != digest
++                        for path, digest in wave.expected_preimages.items()
++                    )
++                ):
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.BLOCKED,
++                        error="previous wave acceptance or preimage pins are invalid",
++                    )
++            action_paths = {
++                path
++                for batch in wave.batches
++                for task in batch.tasks
++                if action_id in task.todo.source_action_ids
++                for path in task.todo.authorized_paths
++            }
++            observed: dict[str, str | None] = {}
++            for path in action_paths:
++                resolved = self._check_containment(path, action_id)
++                if resolved is None:
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.BLOCKED,
++                        error="wave path escaped workspace",
++                    )
++                file = Path(resolved)
++                if os.path.lexists(file) and not file.is_file():
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.BLOCKED,
++                        error="wave preimage is not a regular file",
++                    )
++                observed[path] = hashlib.sha256(file.read_bytes()).hexdigest() if file.is_file() else None
++            try:
++                wave.require_action_preimages(action_id, observed)
++            except ValueError as exc:
++                return BuildActionExecution(action_id=action_id, status=BuildActionStatus.BLOCKED, error=str(exc))
++
+         try:
+             if action_kind == "create" and target_path and content is not None:
+                 full_path = Path(resolved_target)  # type: ignore[arg-type]
+@@ -258,6 +339,35 @@ class EffectExecutor:
+                     post_image_digest=post_digest,
+                 )
+ 
++            elif action_kind == "move" and source_path and target_path:
++                source = Path(resolved_source)  # type: ignore[arg-type]
++                target = Path(resolved_target)  # type: ignore[arg-type]
++                if source == target or not source.is_file() or source.is_symlink() or os.path.lexists(target):
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.FAILED,
++                        error="move requires a regular source and absent distinct destination",
++                    )
++                pre_digest = hashlib.sha256(source.read_bytes()).hexdigest()
++                if expected_source_digest is None or pre_digest != expected_source_digest:
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.FAILED,
++                        error="move source preimage mismatch or missing expected digest",
++                    )
++                self._pre_effect_checkpoint(action_id, source_path, pre_digest, pre_digest, target_path)
++                target.parent.mkdir(parents=True, exist_ok=True)
++                if os.path.lexists(target):
++                    raise EffectExecutionError("move destination changed before effect")
++                os.replace(source, target)
++                self._clear_pre_effect_checkpoint(action_id)
++                return BuildActionExecution(
++                    action_id=action_id,
++                    status=BuildActionStatus.COMPLETED,
++                    pre_image_digest=pre_digest,
++                    post_image_digest=pre_digest,
++                )
++
+             elif action_kind == "remove" and source_path:
+                 full_path = Path(resolved_source)  # type: ignore[arg-type]
+                 if not full_path.exists():
+@@ -329,6 +439,36 @@ class EffectExecutor:
+         # Check for durable pre-effect checkpoint
+         pre_checkpoint = self._has_pre_effect_checkpoint(action_id)
+         if pre_checkpoint is not None:
++            move_target = pre_checkpoint.get("target_path")
++            if isinstance(move_target, str) and move_target:
++                source = self._check_containment(str(pre_checkpoint["file_path"]), action_id)
++                target = self._check_containment(move_target, action_id)
++                if source is None or target is None:
++                    return BuildActionExecution(
++                        action_id=action_id,
++                        status=BuildActionStatus.EFFECT_UNCERTAIN,
++                        error="move path no longer satisfies containment",
++                    )
++                source_file, target_file = Path(source), Path(target)
++                expected = pre_checkpoint.get("expected_post_digest")
++                if not source_file.exists() and target_file.is_file():
++                    actual = hashlib.sha256(target_file.read_bytes()).hexdigest()
++                    if actual == expected:
++                        self._clear_pre_effect_checkpoint(action_id)
++                        self._receipts.issue_verified(
++                            f"reconciled-{action_id}", "host", f"post_effect_reconciled:{action_id}:{actual}"
++                        )
++                        return BuildActionExecution(
++                            action_id=action_id,
++                            status=BuildActionStatus.COMPLETED,
++                            pre_image_digest=actual,
++                            post_image_digest=actual,
++                        )
++                return BuildActionExecution(
++                    action_id=action_id,
++                    status=BuildActionStatus.EFFECT_UNCERTAIN,
++                    error="move destination/source state cannot be confirmed after crash",
++                )
+             # A crash occurred during this effect
+             full_path = Path(os.path.realpath(str(self._workspace / file_path)))
+             if not full_path.exists():
+diff --git a/agent/runtime/event_store.py b/agent/runtime/event_store.py
+index 3f1992f..f443326 100644
+--- a/agent/runtime/event_store.py
++++ b/agent/runtime/event_store.py
+@@ -23,25 +23,41 @@ class EventStore:
+             conn.execute("""
+                 CREATE TABLE IF NOT EXISTS events (
+                     seq INTEGER PRIMARY KEY AUTOINCREMENT,
++                    event_id TEXT UNIQUE,
+                     task_id TEXT NOT NULL,
+                     event_type TEXT NOT NULL,
+                     event_data TEXT NOT NULL,
+                     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                 )
+             """)
++            columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
++            if "event_id" not in columns:
++                conn.execute("ALTER TABLE events ADD COLUMN event_id TEXT")
++            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_identity ON events(event_id)")
+             conn.execute("CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id)")
+             conn.commit()
+         finally:
+             conn.close()
+ 
+-    def append(self, task_id: str, event_type: str, event_data: str) -> int:
+-        """Append an event. Returns the sequence number."""
++    def append(self, task_id: str, event_type: str, event_data: str, *, event_id: str | None = None) -> int:
++        """Append a lifecycle event; keyed retries return the original sequence."""
+         conn = sqlite3.connect(str(self.db_path))
+         try:
+             conn.execute("BEGIN IMMEDIATE")
++            if event_id is not None:
++                if not event_id:
++                    raise ValueError("event_id must not be empty")
++                existing = conn.execute(
++                    "SELECT seq, task_id, event_type, event_data FROM events WHERE event_id = ?", (event_id,)
++                ).fetchone()
++                if existing is not None:
++                    if existing[1:] != (task_id, event_type, event_data):
++                        raise ValueError(f"conflicting lifecycle event: {event_id}")
++                    conn.execute("COMMIT")
++                    return int(existing[0])
+             cursor = conn.execute(
+-                "INSERT INTO events (task_id, event_type, event_data) VALUES (?, ?, ?)",
+-                (task_id, event_type, event_data),
++                "INSERT INTO events (event_id, task_id, event_type, event_data) VALUES (?, ?, ?, ?)",
++                (event_id, task_id, event_type, event_data),
+             )
+             conn.execute("COMMIT")
+             return cursor.lastrowid or 0
+@@ -56,10 +72,13 @@ class EventStore:
+         conn = sqlite3.connect(str(self.db_path))
+         try:
+             rows = conn.execute(
+-                "SELECT seq, event_type, event_data, created_at FROM events WHERE task_id = ? ORDER BY seq",
++                "SELECT seq, event_type, event_data, created_at, event_id FROM events WHERE task_id = ? ORDER BY seq",
+                 (task_id,),
+             ).fetchall()
+-            return [{"seq": r[0], "event_type": r[1], "event_data": r[2], "created_at": r[3]} for r in rows]
++            return [
++                {"seq": r[0], "event_type": r[1], "event_data": r[2], "created_at": r[3], "event_id": r[4]}
++                for r in rows
++            ]
+         finally:
+             conn.close()
+ 
+diff --git a/agent/runtime/host_gap_analyzer.py b/agent/runtime/host_gap_analyzer.py
+index 74ad224..7d748d6 100644
+--- a/agent/runtime/host_gap_analyzer.py
++++ b/agent/runtime/host_gap_analyzer.py
+@@ -62,6 +62,42 @@ def structural_gap_receipt_subject(result: StructuralGapResult, digest: str) ->
+     )
+ 
+ 
++def verify_structural_pass(
++    artifacts: ArtifactStore,
++    receipts: ReceiptStore,
++    task_id: str,
++    run_id: str,
++    result_ref: ArtifactRef,
++    receipt_ref: ReceiptRef,
++    candidate_ref: ArtifactRef | None = None,
++) -> StructuralGapResult:
++    """Recheck the exact structural pass before Scanner, freeze, or transition."""
++    if receipt_ref.issuer_id != "host" or result_ref.contract_id != "structural_analysis_result":
++        raise StructuralGapError("invalid structural gap provenance")
++    raw = artifacts.get_verified(result_ref.artifact_id, result_ref.artifact_revision)
++    if artifacts.get_digest(result_ref.artifact_id, result_ref.artifact_revision) != result_ref.artifact_digest:
++        raise StructuralGapError("structural gap result digest mismatch")
++    result = StructuralGapResult.model_validate_json(raw)
++    if (result.task_id, result.run_id) != (task_id, run_id):
++        raise StructuralGapError("structural gap result belongs to another task or run")
++    if result.execution_status is not StepStatus.COMPLETED or result.findings:
++        raise StructuralGapError("structural gap analysis did not pass")
++    if result.known_critical_gap_detection_rate != 1.0 or not result.walking_skeleton_completed:
++        raise StructuralGapError("structural backtest or walking skeleton incomplete")
++    candidate = result.candidate_specification_ref
++    if candidate_ref is not None and candidate != candidate_ref:
++        raise StructuralGapError("structural pass belongs to another candidate")
++    if artifacts.get_digest(candidate.artifact_id, candidate.artifact_revision) != candidate.artifact_digest:
++        raise StructuralGapError("Planning candidate changed since structural analysis")
++    if not receipts.verify(
++        receipt_ref.receipt_id,
++        receipt_ref.receipt_digest,
++        structural_gap_receipt_subject(result, result_ref.artifact_digest),
++    ):
++        raise StructuralGapError("structural gap completion receipt is not verified")
++    return result
++
++
+ class HostGapAnalyzer:
+     """Verify and persist canonical Gap Analysis without owning its decisions."""
+ 
+diff --git a/agent/runtime/loaders.py b/agent/runtime/loaders.py
+index aac9547..5b875a0 100644
+--- a/agent/runtime/loaders.py
++++ b/agent/runtime/loaders.py
+@@ -19,7 +19,6 @@ _STAGE_ROLES = {
+     "planning": "planner",
+     "fixture_validation": "fixture_validator",
+     "build": "builder",
+-    "build_validation": "build_verifier",
+ }
+ 
+ 
+@@ -153,7 +152,7 @@ def load_workflow_bundle(path: str | Path) -> dict[str, Any]:
+     if any(tracking.get(k) != v for k, v in required_tracking.items()):
+         raise LoaderError("host-owned work tracking contract invalid")
+     if tracking.get("tracked_roles") != list(_STAGE_ROLES):
+-        raise LoaderError("work tracking must cover all six agent roles")
++        raise LoaderError("work tracking must cover all five stages")
+ 
+     expected_roles = list(_STAGE_ROLES)
+     if bundle.get("role_order") != expected_roles or set(roles) != set(expected_roles):
+@@ -198,6 +197,24 @@ def load_workflow_bundle(path: str | Path) -> dict[str, Any]:
+         if stage == "build" and not exchange.get("build_admission_precedes_execution"):
+             raise LoaderError("builder must be admitted before effects")
+ 
++    verification = roles["build"]["workflow"].get("independent_verification")
++    if not isinstance(verification, dict) or verification.get("stage") != "build":
++        raise LoaderError("Build must contain independent verification")
++    verifier = verification.get("workflow")
++    if (
++        not isinstance(verifier, dict)
++        or verifier.get("stage_id") != "build"
++        or verifier.get("role_id") != "build_verifier"
++    ):
++        raise LoaderError("Build verifier must remain an independent role within Build")
++    for name in ("input_schema", "output_schema"):
++        _check_exchange_schema(verifier.get(name), f"build.independent_verification.{name}")
++    outputs = verifier.get("outputs")
++    if not isinstance(outputs, list) or not any(
++        isinstance(output, dict) and output.get("contract_id") == "build_validation_record" for output in outputs
++    ):
++        raise LoaderError("Build verifier must produce independent verification evidence")
++
+     if set(hosts) != _REQUIRED_HOST_WORKFLOWS:
+         missing = sorted(_REQUIRED_HOST_WORKFLOWS - set(hosts))
+         extra = sorted(set(hosts) - _REQUIRED_HOST_WORKFLOWS)
+diff --git a/agent/runtime/memory_promotion.py b/agent/runtime/memory_promotion.py
+index 46df1f2..5292833 100644
+--- a/agent/runtime/memory_promotion.py
++++ b/agent/runtime/memory_promotion.py
+@@ -114,6 +114,7 @@ class HostMemoryManager:
+                 admission.authorized_action_ids,
+                 admission.authorized_tool_ids,
+                 admission.tool_registry_ref,
++                admission.recovery_readiness_ref,
+             ),
+         )
+         if not build.action_executions or any(
+@@ -126,11 +127,12 @@ class HostMemoryManager:
+             not validation.criterion_results
+             or not validation.e2e_results
+             or any(
+-                result.outcome is not CriterionResult.PASS or not result.evidence_refs
++                result.outcome is not CriterionResult.VALID or not result.evidence_refs
+                 for result in validation.criterion_results
+             )
+             or any(
+-                result.outcome is not CriterionResult.PASS or result.exit_code != 0 for result in validation.e2e_results
++                result.outcome is not CriterionResult.VALID or result.exit_code != 0
++                for result in validation.e2e_results
+             )
+             or any(step.status is not StepStatus.COMPLETED for step in validation.step_results)
+         ):
+diff --git a/agent/runtime/research_lifecycle.py b/agent/runtime/research_lifecycle.py
+index 750da6c..a20b9ec 100644
+--- a/agent/runtime/research_lifecycle.py
++++ b/agent/runtime/research_lifecycle.py
+@@ -12,7 +12,7 @@ latest persisted revision is loaded and verified.
+ 
+ from __future__ import annotations
+ 
+-from agent.contracts.common import EvidenceRef
++from agent.contracts.common import ArtifactRef, EvidenceRef
+ from agent.contracts.research import (
+     AdmissionDisposition,
+     ExecutionStatus,
+@@ -31,6 +31,7 @@ from agent.runtime.artifact_store import (
+     ArtifactStore,
+     StaleRevisionError,
+ )
++from agent.runtime.canonical_serialization import SERIALIZER_PROFILE
+ from agent.runtime.event_store import EventStore
+ from agent.runtime.receipt_store import ReceiptStore
+ 
+@@ -89,6 +90,7 @@ class ResearchLifecycle:
+             request_id,
+             "research_request_created",
+             f"created_from={created_from}",
++            event_id=f"research-request-created:{request_id}",
+         )
+         return request
+ 
+@@ -126,6 +128,7 @@ class ResearchLifecycle:
+             updated.request_id,
+             "research_request_updated",
+             f"revision={new_rev}",
++            event_id=f"research-request-updated:{updated.request_id}:{new_rev}",
+         )
+         return updated
+ 
+@@ -167,6 +170,17 @@ class ResearchLifecycle:
+ 
+         # Match against catalog
+         catalog_match = self._catalog.match(intent, keywords)
++        lineage = self._catalog.lineage_for(input_id, catalog_match)
++        lineage_id = f"catalog-lineage-{input_id}"
++        lineage_digest = self._artifacts.put_immutable(lineage, lineage_id, 1, "catalog_lineage", "1.0")
++        lineage_ref = ArtifactRef(
++            artifact_id=lineage_id,
++            artifact_revision=1,
++            artifact_digest=lineage_digest,
++            contract_id="catalog_lineage",
++            contract_version="1.0",
++            serializer_profile=SERIALIZER_PROFILE,
++        )
+ 
+         # Issue host receipt for admission
+         admission_subject = f"research_admission:{parent_request_id}:{input_id}:1"
+@@ -194,6 +208,7 @@ class ResearchLifecycle:
+             expected_result=expected_result,
+             supporting_input_refs=supporting_input_refs,
+             catalog_matches=(catalog_match,),
++            catalog_lineage_ref=lineage_ref,
+             admission=admission,
+         )
+ 
+@@ -220,6 +235,7 @@ class ResearchLifecycle:
+             parent_request_id,
+             "input_admitted",
+             f"input={input_id} intent={intent.value}",
++            event_id=f"research-input-admitted:{parent_request_id}:{input_id}:1",
+         )
+         return input_request
+ 
+@@ -341,6 +357,7 @@ class ResearchLifecycle:
+             parent_request_id,
+             "output_produced",
+             f"output={output_id} responds_to={responds_to_input_id}@{responds_to_revision}",
++            event_id=f"research-output-produced:{parent_request_id}:{output_id}:1",
+         )
+         return output
+ 
+@@ -447,6 +464,7 @@ class ResearchLifecycle:
+             output.parent_request_id,
+             "output_reviewed",
+             f"output={output_id} disposition={disposition.value}",
++            event_id=f"research-output-reviewed:{output.parent_request_id}:{output_id}:{new_rev}",
+         )
+         return updated
+ 
+@@ -522,6 +540,7 @@ class ResearchLifecycle:
+             output.parent_request_id,
+             "planning_handoff",
+             f"output={output_id}",
++            event_id=f"planning-handoff:{output.parent_request_id}:{output_id}:{output.revision}",
+         )
+         return output
+ 
+@@ -610,6 +629,7 @@ class ResearchLifecycle:
+             parent_request_id,
+             "input_corrected",
+             f"input={input_id} revision={new_rev}",
++            event_id=f"research-input-corrected:{parent_request_id}:{input_id}:{new_rev}",
+         )
+         return corrected
+ 
+@@ -648,6 +668,7 @@ class ResearchLifecycle:
+                 request_id,
+                 "reconcile_orphans_detected",
+                 f"orphaned_refs={','.join(orphans)}",
++                event_id=f"reconcile-orphans:{request_id}:{request.revision}",
+             )
+ 
+         # Verify current_accepted_result_ref if set
+@@ -662,17 +683,20 @@ class ResearchLifecycle:
+                             request_id,
+                             "reconcile_accepted_result_missing",
+                             f"ref={request.current_accepted_result_ref}",
++                            event_id=f"reconcile-result-missing:{request_id}:{request.revision}",
+                         )
+                 except ValueError:
+                     self._events.append(
+                         request_id,
+                         "reconcile_accepted_result_malformed",
+                         f"ref={request.current_accepted_result_ref}",
++                        event_id=f"reconcile-result-malformed:{request_id}:{request.revision}",
+                     )
+ 
+         self._events.append(
+             request_id,
+             "reconcile_completed",
+             f"children={len(request.child_refs)} orphans={len(orphans)}",
++            event_id=f"reconcile-completed:{request_id}:{request.revision}",
+         )
+         return request
+diff --git a/agent/runtime/scanner_gateway.py b/agent/runtime/scanner_gateway.py
+index e81ef08..c6179f0 100644
+--- a/agent/runtime/scanner_gateway.py
++++ b/agent/runtime/scanner_gateway.py
+@@ -48,6 +48,9 @@ class ScannerGateway:
+         ScannerFinding objects. An empty tuple means the detector found
+         no issues (PASS). A non-empty tuple means issues were found.
+         """
++        previous = self._detectors.get(capability_id)
++        if previous is not None and previous is not detector:
++            raise ScannerGatewayError("Scanner detector registration is immutable")
+         self._registered_capabilities.add(capability_id)
+         self._detectors[capability_id] = detector
+ 
+@@ -56,6 +59,7 @@ class ScannerGateway:
+         candidate_ref: ArtifactRef,
+         repository_identity: str,
+         capabilities: tuple[str, ...],
++        registry_ref: ArtifactRef | None = None,
+     ) -> ScannerResult:
+         """Scan exact candidate bytes for requested capabilities.
+ 
+@@ -63,24 +67,36 @@ class ScannerGateway:
+         matches the expected digest in the candidate_ref. Returns BLOCKED
+         if the artifact store is unavailable or the artifact cannot be verified.
+         """
+-        unsupported = [c for c in capabilities if c not in self._registered_capabilities]
+-        if unsupported:
++        if not capabilities:
+             return ScannerResult(
+-                request_id=f"scan-{candidate_ref.artifact_id}",
++                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
+                 outcome=ScannerOutcome.BLOCKED,
+-                capabilities_checked=tuple(c for c in capabilities if c in self._registered_capabilities),
+-                capabilities_not_checked=tuple(unsupported),
+-                limitation_reasons=tuple(f"unsupported capability: {c}" for c in unsupported),
++                limitation_reasons=("no Scanner capabilities requested",),
++                candidate_ref=candidate_ref,
++                repository_identity=repository_identity,
++                registry_ref=registry_ref,
+             )
++        result = self._scan_exact_unbound(candidate_ref, repository_identity, capabilities)
++        return result.model_copy(
++            update={
++                "candidate_ref": candidate_ref,
++                "repository_identity": repository_identity,
++                "requested_capabilities": capabilities,
++                "registry_ref": registry_ref,
++            }
++        )
+ 
+-        # No capabilities requested — nothing to verify
+-        if not capabilities:
++    def _scan_exact_unbound(
++        self, candidate_ref: ArtifactRef, repository_identity: str, capabilities: tuple[str, ...]
++    ) -> ScannerResult:
++        unsupported = [c for c in capabilities if c not in self._registered_capabilities]
++        if unsupported:
+             return ScannerResult(
+-                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
+-                outcome=ScannerOutcome.PASS,
++                request_id=f"scan-{candidate_ref.artifact_id}",
++                outcome=ScannerOutcome.BLOCKED,
+                 capabilities_checked=(),
+-                capabilities_not_checked=(),
+-                findings=(),
++                capabilities_not_checked=capabilities,
++                limitation_reasons=tuple(f"unsupported capability: {c}" for c in unsupported),
+             )
+ 
+         # Verify content integrity if artifact store is available
+@@ -138,11 +154,11 @@ class ScannerGateway:
+                 continue
+ 
+             # Retrieve artifact content for detector execution
+-            artifact_bytes = self._artifact_store.get_verified(
+-                candidate_ref.artifact_id,
+-                candidate_ref.artifact_revision,
+-            )
+             try:
++                artifact_bytes = self._artifact_store.get_verified(
++                    candidate_ref.artifact_id,
++                    candidate_ref.artifact_revision,
++                )
+                 findings = detector(artifact_bytes)
+             except Exception as exc:
+                 not_checked.append(cap)
+@@ -165,7 +181,7 @@ class ScannerGateway:
+         # All detectors executed — PASS only if no findings
+         return ScannerResult(
+             request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
+-            outcome=ScannerOutcome.PASS if not all_findings else ScannerOutcome.BLOCKED,
++            outcome=ScannerOutcome.PASS if not all_findings else ScannerOutcome.FAIL,
+             capabilities_checked=capabilities,
+             capabilities_not_checked=(),
+             findings=tuple(all_findings),
+@@ -173,4 +189,4 @@ class ScannerGateway:
+ 
+     @property
+     def supported_capabilities(self) -> tuple[str, ...]:
+-        return tuple(self._registered_capabilities)
++        return tuple(sorted(self._registered_capabilities))
+diff --git a/agent/runtime/specification_freezer.py b/agent/runtime/specification_freezer.py
+index 3b0ed70..fbda0db 100644
+--- a/agent/runtime/specification_freezer.py
++++ b/agent/runtime/specification_freezer.py
+@@ -6,8 +6,13 @@ from pydantic import BaseModel
+ 
+ from agent.contracts.common import ArtifactRef
+ from agent.contracts.host import FreezeReceipt, ReceiptRef
++from agent.contracts.scanner import ScannerEvidence
+ from agent.runtime.artifact_store import ArtifactStore
++from agent.runtime.canonical_serialization import canonical_bytes, digest_raw
++from agent.runtime.host_gap_analyzer import verify_structural_pass
+ from agent.runtime.receipt_store import ReceiptStore
++from agent.runtime.scanner_check_registry import ScannerCheckRegistry
++from agent.runtime.scanner_evidence import verify_scanner_evidence
+ 
+ 
+ class FreezeError(Exception):
+@@ -37,31 +42,62 @@ class SpecificationFreezer:
+         revision: int,
+         contract_id: str,
+         contract_version: str,
+-        scanner_receipt_id: str,
+-        scanner_receipt_digest: str,
++        scanner_evidence: ScannerEvidence,
++        scanner_check_registry_ref: ArtifactRef,
++        gap_result_ref: ArtifactRef,
++        gap_receipt_ref: ReceiptRef,
++        task_id: str,
++        run_id: str,
+         repository_identity_ref: str,
+         authorization_receipt_id: str,
+         authorization_receipt_digest: str,
+         issuer_id: str = "host",
+     ) -> FreezeReceipt:
+-        """Freeze a candidate specification."""
+-        # Store the artifact
+-        digest = self._store.put_immutable(candidate_model, artifact_id, revision, contract_id, contract_version)
+-
+-        # Issue freeze receipt
+-        freeze_receipt_id = f"freeze-{artifact_id}-rev{revision}"
+-        _, _freeze_receipt_digest = self._receipts.issue_verified(freeze_receipt_id, issuer_id, digest)
+-
+-        # Build artifact refs
++        """Freeze only after exact structural, Scanner, and approval receipts verify."""
++        digest_before_write = digest_raw(canonical_bytes(candidate_model))
+         candidate_ref = ArtifactRef(
+             artifact_id=artifact_id,
+             artifact_revision=revision,
+-            artifact_digest=digest,
++            artifact_digest=digest_before_write,
+             contract_id=contract_id,
+             contract_version=contract_version,
+             serializer_profile="rfc8785-jcs-sha256-v1",
+         )
+-        frozen_ref = candidate_ref.model_copy(update={"artifact_id": f"frozen-{artifact_id}"})
++        try:
++            verify_structural_pass(
++                self._store,
++                self._receipts,
++                task_id,
++                run_id,
++                gap_result_ref,
++                gap_receipt_ref,
++                candidate_ref,
++            )
++            registry = ScannerCheckRegistry(self._store, scanner_check_registry_ref)
++            verify_scanner_evidence(
++                self._store,
++                self._receipts,
++                scanner_evidence,
++                candidate_ref,
++                registry,
++                task_id,
++                run_id,
++                repository_identity_ref,
++            )
++        except Exception as exc:
++            raise FreezeError(f"Planning gates are not valid: {exc}") from exc
++        if issuer_id != "host" or not self._receipts.verify(
++            authorization_receipt_id,
++            authorization_receipt_digest,
++            f"approve-freeze:{digest_before_write}",
++        ):
++            raise FreezeError("host approval receipt is not verified")
++
++        digest = self._store.put_immutable(candidate_model, artifact_id, revision, contract_id, contract_version)
++
++        # Build artifact refs
++        if digest != digest_before_write:
++            raise FreezeError("candidate changed during freeze")
+         # Store frozen copy
+         frozen_digest = self._store.put_immutable(
+             candidate_model, f"frozen-{artifact_id}", revision, contract_id, contract_version
+@@ -75,13 +111,16 @@ class SpecificationFreezer:
+             serializer_profile="rfc8785-jcs-sha256-v1",
+         )
+ 
++        freeze_receipt_id = f"freeze-{artifact_id}-rev{revision}"
++        self._receipts.issue_verified(freeze_receipt_id, issuer_id, digest)
++
+         return FreezeReceipt(
+             candidate_ref=candidate_ref,
+             frozen_ref=frozen_ref,
+             scanner_receipt_ref=ReceiptRef(
+-                receipt_id=scanner_receipt_id,
+-                receipt_digest=scanner_receipt_digest,
+-                issuer_id="scanner",
++                receipt_id=scanner_evidence.receipt_ref.receipt_id,
++                receipt_digest=scanner_evidence.receipt_ref.receipt_digest,
++                issuer_id="host",
+             ),
+             repository_identity_ref=repository_identity_ref,
+             authorization_receipt_ref=ReceiptRef(
+diff --git a/agent/runtime/stage_journal.py b/agent/runtime/stage_journal.py
+index 56d7b2b..1e3d056 100644
+--- a/agent/runtime/stage_journal.py
++++ b/agent/runtime/stage_journal.py
+@@ -14,6 +14,7 @@ from pathlib import Path
+ from agent.contracts.host import ReceiptRef
+ from agent.contracts.stage_log import StageLogEvent, StageName
+ from agent.runtime.receipt_store import ReceiptStore
++from agent.runtime.runtime_root_registry import RuntimeRootRegistry
+ 
+ STAGES: tuple[StageName, ...] = ("search", "audit", "plan", "build", "mem")
+ 
+@@ -23,6 +24,11 @@ class StageJournalError(ValueError):
+ 
+ 
+ class StageJournalService:
++    @classmethod
++    def from_registry(cls, roots: RuntimeRootRegistry, root_id: str, event_db_path: str | Path) -> StageJournalService:
++        """Bind journal projections to a host-registered runtime root."""
++        return cls(roots.resolve(root_id), event_db_path)
++
+     def __init__(self, runtime_root: str | Path, event_db_path: str | Path) -> None:
+         Path(runtime_root).mkdir(parents=True, exist_ok=True)
+         self._root = Path(runtime_root).resolve(strict=True)
+diff --git a/agent/runtime/work_todo.py b/agent/runtime/work_todo.py
+index 1e028b2..6d413cc 100644
+--- a/agent/runtime/work_todo.py
++++ b/agent/runtime/work_todo.py
+@@ -109,7 +109,7 @@ class WorkTodoManager:
+         was_new = self._artifacts.latest_revision(aid) == 0
+         digest = self._artifacts.put_immutable(initial, aid, 1, "work_todo", "1.0")
+         if was_new:
+-            self._events.append(binding.task_id, "work_todo_created", aid)
++            self._events.append(binding.task_id, "work_todo_created", aid, event_id=f"work-todo-created:{aid}")
+         revision = self._artifacts.latest_revision(aid)
+         ref = self._ref(aid, revision, self._artifacts.get_digest(aid, revision) or digest, "work_todo")
+         return self.read(ref), ref
+@@ -173,7 +173,12 @@ class WorkTodoManager:
+         )
+         revision, digest = self._artifacts.put_cas(updated, ref.artifact_id, ref.artifact_revision, "work_todo", "1.0")
+         new_ref = self._ref(ref.artifact_id, revision, digest, "work_todo")
+-        self._events.append(record.task_id, "work_todo_updated", f"{action_id}:{status.value}:rev{revision}")
++        self._events.append(
++            record.task_id,
++            "work_todo_updated",
++            f"{action_id}:{status.value}:rev{revision}",
++            event_id=f"work-todo-updated:{ref.artifact_id}:{revision}",
++        )
+         return updated, new_ref
+ 
+     def require_complete(self, ref: ArtifactRef, *, task_id: str, run_id: str, stage: str) -> TodoList:
+diff --git a/tests/artifacts/test_stores.py b/tests/artifacts/test_stores.py
+index c116bc8..8d8c143 100644
+--- a/tests/artifacts/test_stores.py
++++ b/tests/artifacts/test_stores.py
+@@ -96,6 +96,32 @@ class TestEventStore:
+         assert len(events) == 2
+         assert events[0]["seq"] < events[1]["seq"]
+ 
++    def test_keyed_replay_is_single_event_and_conflict_is_rejected(self, tmp_path):
++        store = EventStore(tmp_path)
++        first = store.append("task-001", "stage_transition", "research -> audit", event_id="transition-1")
++        assert store.append("task-001", "stage_transition", "research -> audit", event_id="transition-1") == first
++        assert len(store.list("task-001")) == 1
++        with pytest.raises(ValueError, match="conflicting"):
++            store.append("task-001", "stage_transition", "audit -> planning", event_id="transition-1")
++
++    def test_legacy_event_rows_survive_identity_migration(self, tmp_path):
++        import sqlite3
++
++        database = tmp_path / "events.db"
++        with sqlite3.connect(database) as conn:
++            conn.execute(
++                "CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, "
++                "event_type TEXT NOT NULL, event_data TEXT NOT NULL, "
++                "created_at TEXT NOT NULL DEFAULT (datetime('now')))"
++            )
++            conn.execute(
++                "INSERT INTO events(task_id,event_type,event_data,created_at) VALUES(?,?,?,?)",
++                ("task-001", "legacy", "old", "2026-01-01"),
++            )
++        store = EventStore(tmp_path)
++        store.append("task-001", "new", "value", event_id="new-1")
++        assert [event["event_type"] for event in store.list("task-001")] == ["legacy", "new"]
++
+ 
+ class TestCheckpointStore:
+     def test_cas_success(self, tmp_path):
+diff --git a/tests/contracts/test_host_gap_analysis.py b/tests/contracts/test_host_gap_analysis.py
+index 536782e..8f88e1d 100644
+--- a/tests/contracts/test_host_gap_analysis.py
++++ b/tests/contracts/test_host_gap_analysis.py
+@@ -113,26 +113,46 @@ def test_scanner_dispatch_accepts_only_exact_candidate_and_receipt(tmp_path) ->
+     request, runner = build_gap_inputs(controller)
+     outcome = controller.run_structural_gap_analysis(request, walking_skeleton_runner=runner)
+     assert outcome.completion_receipt_ref is not None
+-    controller.scanner.register_detector("syntax", lambda _content: ())
++    from tests.fixtures.scanner import passing_scan
++
++    scanner_evidence = passing_scan(controller, outcome)
++    assert controller.planning_ready_for_approval(
++        request.task_id,
++        request.run_id,
++        request.candidate_specification_ref,
++        outcome.result_ref,
++        outcome.completion_receipt_ref,
++        scanner_evidence,
++    )
+     result = controller.scan_planning_candidate(
+         request.task_id,
+         request.run_id,
+         request.candidate_specification_ref,
+         "repo-snapshot",
+-        ("syntax",),
++        ("syntax", "types"),
+         outcome.result_ref,
+         outcome.completion_receipt_ref,
+     )
+-    assert result.outcome == ScannerOutcome.PASS
++    assert result.result.outcome == ScannerOutcome.PASS
++    assert result.evidence is not None
+ 
+     wrong = request.candidate_specification_ref.model_copy(update={"artifact_id": "different-candidate"})
+-    with pytest.raises(TransitionError, match="different candidate"):
++    with pytest.raises(TransitionError, match="another candidate"):
++        controller.planning_ready_for_approval(
++            request.task_id,
++            request.run_id,
++            wrong,
++            outcome.result_ref,
++            outcome.completion_receipt_ref,
++            scanner_evidence,
++        )
++    with pytest.raises(TransitionError, match="another candidate"):
+         controller.scan_planning_candidate(
+             request.task_id,
+             request.run_id,
+             wrong,
+             "repo-snapshot",
+-            ("syntax",),
++            ("syntax", "types"),
+             outcome.result_ref,
+             outcome.completion_receipt_ref,
+         )
+diff --git a/tests/contracts/test_memory_promotion.py b/tests/contracts/test_memory_promotion.py
+index f5f97dc..5c3f673 100644
+--- a/tests/contracts/test_memory_promotion.py
++++ b/tests/contracts/test_memory_promotion.py
+@@ -10,6 +10,7 @@ from agent.contracts.build_validation import (
+     CriterionResult,
+     E2EResult,
+     ObservedCriterionResult,
++    ValidationIssueInput,
+ )
+ from agent.contracts.common import ArtifactRef
+ from agent.contracts.host import (
+@@ -119,7 +120,7 @@ def setup_case(tmp_path, *, success=True):
+             ObservedCriterionResult(
+                 criterion_id="AC-001",
+                 observed_result="passed",
+-                outcome=CriterionResult.PASS,
++                outcome=CriterionResult.VALID,
+                 evidence_refs=("EVD-001",),
+                 independent_observation="CI observed",
+             ),
+@@ -129,7 +130,11 @@ def setup_case(tmp_path, *, success=True):
+                 e2e_id="e2e",
+                 entrypoint="pytest",
+                 exit_code=0 if success else 1,
+-                outcome=CriterionResult.PASS if success else CriterionResult.FAIL,
++                outcome=CriterionResult.VALID if success else CriterionResult.NOT_VALID,
++                evidence_refs=("EVD-001",),
++                issue_input=None
++                if success
++                else ValidationIssueInput(issue_type="verifiability", reason="E2E failed", evidence_status="not_valid"),
+             ),
+         ),
+     )
+diff --git a/tests/contracts/test_stage_journal.py b/tests/contracts/test_stage_journal.py
+index 9d4a384..3238ec2 100644
+--- a/tests/contracts/test_stage_journal.py
++++ b/tests/contracts/test_stage_journal.py
+@@ -6,6 +6,8 @@ from datetime import UTC, datetime
+ import pytest
+ 
+ from agent.contracts.stage_log import StageLogEvent
++from agent.runtime.event_store import EventStore
++from agent.runtime.runtime_root_registry import RuntimeRootRegistry
+ from agent.runtime.stage_journal import StageJournalError, StageJournalService
+ 
+ 
+@@ -35,6 +37,24 @@ def test_per_run_order_and_idempotency(tmp_path):
+     assert len((tmp_path / "runtime/w/t/r/audit.log").read_text().splitlines()) == 1
+ 
+ 
++def test_stage_journal_and_workflow_events_keep_distinct_owners(tmp_path):
++    events = EventStore(tmp_path)
++    journal = StageJournalService(tmp_path / "runtime", tmp_path / "events.db")
++    journal.append(event())
++    assert events.list("t") == []
++    events.append("t", "stage_transition", "research -> audit", event_id="transition-1")
++    assert len(journal.load(workspace_id="w", task_id="t", run_id="r", stage="search")) == 1
++    assert len(events.list("t")) == 1
++
++
++def test_stage_journal_uses_registered_runtime_root(tmp_path):
++    roots = RuntimeRootRegistry()
++    roots.register("stage-logs", tmp_path / "runtime")
++    journal = StageJournalService.from_registry(roots, "stage-logs", tmp_path / "events.db")
++    journal.append(event())
++    assert (tmp_path / "runtime/w/t/r/search.log").is_file()
++
++
+ def test_rebuild_after_lost_projection(tmp_path):
+     service = StageJournalService(tmp_path / "runtime", tmp_path / "events.db")
+     service.append(event())
+diff --git a/tests/contracts/test_tool_registry.py b/tests/contracts/test_tool_registry.py
+index 9875f72..6b4260d 100644
+--- a/tests/contracts/test_tool_registry.py
++++ b/tests/contracts/test_tool_registry.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ import pytest
+ from pydantic import ValidationError
+ 
+-from agent.contracts.common import ArtifactRef
++from agent.contracts.common import ArtifactRef, DiagnosticStatus
+ from agent.contracts.planning import BuildSpecification, CreateAction
+ from agent.contracts.tool_registry import (
+     ParamKind,
+@@ -22,6 +22,7 @@ from agent.runtime.artifact_store import ArtifactStore
+ from agent.runtime.build_admission import BuildAdmission, BuildAdmissionError
+ from agent.runtime.package_lock import PackageLock
+ from agent.runtime.receipt_store import ReceiptStore
++from agent.runtime.recovery_readiness import RecoveryReadiness, pin_recovery_readiness
+ from agent.runtime.tool_registry import (
+     ToolRegistryError,
+     load_pinned_tool_registry,
+@@ -178,11 +179,24 @@ def test_build_admission_derives_tools_from_locked_spec(tmp_path) -> None:
+         )
+     lock = PackageLock(store, receipts).lock("lock-001", *upstream, tool_registry_ref=registry_ref)
+     subject = ":".join(ref.artifact_digest for ref in upstream) + ":" + registry_ref.artifact_digest
++    readiness_ref = pin_recovery_readiness(
++        store,
++        RecoveryReadiness(
++            task_id="task-001",
++            run_id="run-001",
++            checkpoint_ref=upstream[0],
++            operation_ledger_ref=upstream[1],
++            reconciliation_check_ref=upstream[2],
++            diagnostic_status=DiagnosticStatus.VALID,
++        ),
++        "synthetic-recovery-readiness",
++    )
+     admission = BuildAdmission(receipts, store).admit(
+         "adm-001",
+         lock.receipt_ref,
+         ("act-001",),
+         subject,
++        recovery_readiness_ref=readiness_ref,
+         build_spec=spec(invocation()),
+         package_lock=lock,
+     )
+diff --git a/tests/e2e/test_real_workflow.py b/tests/e2e/test_real_workflow.py
+index 1cb0fe8..0960123 100644
+--- a/tests/e2e/test_real_workflow.py
++++ b/tests/e2e/test_real_workflow.py
+@@ -6,9 +6,15 @@ from pathlib import Path
+ import pytest
+ from pydantic import BaseModel
+ 
+-from agent.contracts.build import BuildActionStatus
++from agent.contracts.build import BuildActionStatus, BuildRecord
++from agent.contracts.build_validation import (
++    BuildValidationRecord,
++    CriterionResult,
++    E2EResult,
++    ObservedCriterionResult,
++)
+ from agent.contracts.common import ArtifactRef
+-from agent.contracts.host import ReceiptRef
++from agent.contracts.host import HostDispatchResult, ReceiptRef
+ from agent.contracts.research import (
+     AuthorizationStatus,
+     CriteriaStatus,
+@@ -27,6 +33,7 @@ from agent.runtime.controller import STAGE_ORDER, HostController, Stage, Transit
+ from agent.runtime.effect_executor import EffectExecutor
+ from agent.runtime.receipt_store import ReceiptStore
+ from agent.runtime.scanner_gateway import ScannerGateway
++from tests.fixtures.scanner import passing_scan
+ from tests.fixtures.structural_gap import passing_gap
+ 
+ LOCK_SUBJECT = "package_lock"
+@@ -36,7 +43,7 @@ class _WorkFixture(BaseModel):
+     label: str
+ 
+ 
+-def _completed_work_todo(controller, task_id, run_id, stage):
++def _completed_work_todo(controller, task_id, run_id, stage, output_ref=None):
+     """Record actual persisted test evidence before accepting a simulated stage."""
+     request_id = f"request-{stage.value}"
+     request_name = f"fixture-input-{task_id}-{run_id}-{stage.value}"
+@@ -66,17 +73,18 @@ def _completed_work_todo(controller, task_id, run_id, stage):
+         expected_result=f"Verified {stage.value} fixture output",
+     )
+     _work, running = controller.work_todos.set_status(todo_ref, "work-1", WorkStatus.RUNNING)
+-    output_digest = controller.artifact_store.put_immutable(
+-        _WorkFixture(label=f"observed {stage.value}"), evidence_name, 1, "fixture", "1.0"
+-    )
+-    output_ref = ArtifactRef(
+-        artifact_id=evidence_name,
+-        artifact_revision=1,
+-        artifact_digest=output_digest,
+-        contract_id="fixture",
+-        contract_version="1.0",
+-        serializer_profile=SERIALIZER_PROFILE,
+-    )
++    if output_ref is None:
++        output_digest = controller.artifact_store.put_immutable(
++            _WorkFixture(label=f"observed {stage.value}"), evidence_name, 1, "fixture", "1.0"
++        )
++        output_ref = ArtifactRef(
++            artifact_id=evidence_name,
++            artifact_revision=1,
++            artifact_digest=output_digest,
++            contract_id="fixture",
++            contract_version="1.0",
++            serializer_profile=SERIALIZER_PROFILE,
++        )
+     _work, completed = controller.work_todos.set_status(
+         running,
+         "work-1",
+@@ -94,6 +102,7 @@ def _advance_with_receipt(controller, task_id, run_id, stage):
+     if stage is Stage.PLANNING:
+         gap = passing_gap(controller)
+         assert gap.completion_receipt_ref is not None
++        scanner_evidence = passing_scan(controller, gap)
+         return controller.advance_stage(
+             task_id,
+             run_id,
+@@ -101,11 +110,74 @@ def _advance_with_receipt(controller, task_id, run_id, stage):
+             receipt,
+             gap_result_ref=gap.result_ref,
+             gap_receipt_ref=gap.completion_receipt_ref,
++            scanner_evidence=scanner_evidence,
+             todo_ref=todo_ref,
+         )
+     return controller.advance_stage(task_id, run_id, stage, receipt, todo_ref=todo_ref)
+ 
+ 
++def _build_verification_ref(controller, *, outcome=CriterionResult.VALID):
++    placeholder = ArtifactRef(
++        artifact_id="test-placeholder",
++        artifact_revision=1,
++        artifact_digest="a" * 64,
++        contract_id="test_placeholder",
++        contract_version="1.0",
++        serializer_profile=SERIALIZER_PROFILE,
++    )
++    build = BuildRecord(
++        task_id="task-001", run_id="run-001", stage_revision=1, lock_ref=placeholder, admission_ref=placeholder
++    )
++    build_digest = controller.artifact_store.put_immutable(build, "test-build-record", 1, "build_record", "1.0")
++    build_ref = placeholder.model_copy(
++        update={"artifact_id": "test-build-record", "artifact_digest": build_digest, "contract_id": "build_record"}
++    )
++    issue_input = None
++    if outcome is not CriterionResult.VALID:
++        from agent.contracts.build_validation import ValidationIssueInput
++        from agent.contracts.common import DiagnosticStatus
++
++        issue_input = ValidationIssueInput(
++            issue_type="verifiability", reason="Verifier did not pass", evidence_status=DiagnosticStatus.NOT_VALID
++        )
++    record = BuildValidationRecord(
++        task_id="task-001",
++        run_id="run-001",
++        stage_revision=1,
++        build_ref=build_ref,
++        criterion_results=(
++            ObservedCriterionResult(
++                criterion_id="AC-001",
++                observed_result="Observed product behavior",
++                outcome=outcome,
++                evidence_refs=("test-check",),
++                independent_observation="Verifier checked the outcome",
++                issue_input=issue_input,
++            ),
++        ),
++        e2e_results=(
++            E2EResult(
++                e2e_id="E2E-001",
++                entrypoint="test-check",
++                exit_code=0 if outcome is CriterionResult.VALID else 1,
++                outcome=outcome,
++                evidence_refs=("test-check",),
++                issue_input=issue_input,
++            ),
++        ),
++    )
++    digest = controller.artifact_store.put_immutable(
++        record, "test-build-verification", 1, "build_validation_record", "1.0"
++    )
++    return build_ref.model_copy(
++        update={
++            "artifact_id": "test-build-verification",
++            "artifact_digest": digest,
++            "contract_id": "build_validation_record",
++        }
++    )
++
++
+ def _make_admission(receipts, action_ids=("act-001",), lock_subject=LOCK_SUBJECT):
+     """Helper: issue lock receipt and admission."""
+     _, lock_digest = receipts.issue_verified("lock-001", "host", lock_subject)
+@@ -157,7 +229,6 @@ class TestE2EWorkflow:
+             Stage.PLANNING,
+             Stage.FIXTURE_VALIDATION,
+             Stage.BUILD,
+-            Stage.BUILD_VALIDATION,
+         )
+         assert expected == STAGE_ORDER
+ 
+@@ -206,6 +277,17 @@ class TestE2EWorkflow:
+ 
+         gap = passing_gap(controller)
+         assert gap.completion_receipt_ref is not None
++        with pytest.raises(TransitionError, match="Scanner coverage"):
++            controller.advance_stage(
++                "task-001",
++                "run-001",
++                Stage.PLANNING,
++                receipt,
++                gap_result_ref=gap.result_ref,
++                gap_receipt_ref=gap.completion_receipt_ref,
++                todo_ref=todo_ref,
++            )
++        scanner_evidence = passing_scan(controller, gap)
+         state = controller.advance_stage(
+             "task-001",
+             "run-001",
+@@ -213,6 +295,7 @@ class TestE2EWorkflow:
+             receipt,
+             gap_result_ref=gap.result_ref,
+             gap_receipt_ref=gap.completion_receipt_ref,
++            scanner_evidence=scanner_evidence,
+             todo_ref=todo_ref,
+         )
+         assert state.current_stage == Stage.FIXTURE_VALIDATION
+@@ -273,17 +356,112 @@ class TestScenarios:
+         for stage in STAGE_ORDER[:-1]:
+             _advance_with_receipt(controller, "task-001", "run-001", stage)
+         state = controller.get_state("task-001")
+-        assert state.current_stage == Stage.BUILD_VALIDATION
+-        final_ref = _completed_work_todo(controller, "task-001", "run-001", Stage.BUILD_VALIDATION)
+-        final_receipt = controller.issue_stage_receipt(Stage.BUILD_VALIDATION, task_id="task-001", run_id="run-001")
++        assert state.current_stage == Stage.BUILD
++        verification_ref = _build_verification_ref(controller)
++        verification = BuildValidationRecord.model_validate_json(
++            controller.artifact_store.get_verified(verification_ref.artifact_id, verification_ref.artifact_revision)
++        )
++        envelope, _, pending = controller.prepare_agent_dispatch(
++            "task-001",
++            verification.build_ref,
++            "Verify the integrated Build",
++            requested_role="build_verifier",
++        )
++        assert envelope.stage == "build"
++        assert envelope.role == "build_verifier"
++        final_receipt = controller.issue_stage_receipt(
++            Stage.BUILD,
++            task_id="task-001",
++            run_id="run-001",
++            artifact_id=verification_ref.artifact_id,
++            revision=verification_ref.artifact_revision,
++            artifact_digest=verification_ref.artifact_digest,
++        )
++        with pytest.raises(TransitionError, match="independent verification evidence"):
++            controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=pending)
++        controller.receive_agent_result(
++            envelope,
++            HostDispatchResult(
++                task_id=envelope.task_id,
++                run_id=envelope.run_id,
++                stage=envelope.stage,
++                role=envelope.role,
++                request_id=envelope.request_id,
++                request_revision=envelope.request_revision,
++                respond_to=envelope.respond_to,
++                output_ref=verification_ref,
++            ),
++        )
++        _, running = controller.work_todos.set_status(pending, "work-1", WorkStatus.RUNNING)
++        _, final_ref = controller.work_todos.set_status(
++            running,
++            "work-1",
++            WorkStatus.COMPLETED,
++            actual_result="Independent verification passed",
++            evidence_refs=(verification_ref,),
++        )
+         with pytest.raises(TransitionError, match="final-stage work list"):
+             controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=None)
+         state = controller.complete_final_stage("task-001", "run-001", final_receipt, todo_ref=final_ref)
+-        assert Stage.BUILD_VALIDATION in state.completed_stages
++        assert Stage.BUILD in state.completed_stages
+         from agent.cli import cmd_verify
+ 
+         assert cmd_verify("task-001", state_root=str(tmp_path)) == 0
+ 
++    def test_final_build_rejects_failed_independent_verification(self, tmp_path):
++        controller = HostController(state_root=tmp_path)
++        controller.init_task("task-001", "run-001")
++        for stage in STAGE_ORDER[:-1]:
++            _advance_with_receipt(controller, "task-001", "run-001", stage)
++        verification_ref = _build_verification_ref(controller, outcome=CriterionResult.NOT_VALID)
++        verification = BuildValidationRecord.model_validate_json(
++            controller.artifact_store.get_verified(verification_ref.artifact_id, verification_ref.artifact_revision)
++        )
++        envelope, _, pending = controller.prepare_agent_dispatch(
++            "task-001", verification.build_ref, "Verify the integrated Build", requested_role="build_verifier"
++        )
++        controller.receive_agent_result(
++            envelope,
++            HostDispatchResult(
++                task_id=envelope.task_id,
++                run_id=envelope.run_id,
++                stage=envelope.stage,
++                role=envelope.role,
++                request_id=envelope.request_id,
++                request_revision=envelope.request_revision,
++                respond_to=envelope.respond_to,
++                output_ref=verification_ref,
++            ),
++        )
++        _, running = controller.work_todos.set_status(pending, "work-1", WorkStatus.RUNNING)
++        _, completed = controller.work_todos.set_status(
++            running,
++            "work-1",
++            WorkStatus.COMPLETED,
++            actual_result="Independent verification failed",
++            evidence_refs=(verification_ref,),
++        )
++        receipt = controller.issue_stage_receipt(
++            Stage.BUILD,
++            task_id="task-001",
++            run_id="run-001",
++            artifact_id=verification_ref.artifact_id,
++            revision=verification_ref.artifact_revision,
++            artifact_digest=verification_ref.artifact_digest,
++        )
++        with pytest.raises(TransitionError, match="passing independent verification"):
++            controller.complete_final_stage("task-001", "run-001", receipt, completed)
++        assert Stage.BUILD not in controller.get_state("task-001").completed_stages
++        rework_ref = controller.route_validation_rework("task-001", "run-001", verification_ref)
++        from agent.contracts.build_validation import PlanningReworkInput
++
++        rework = PlanningReworkInput.model_validate_json(
++            controller.artifact_store.get_verified(rework_ref.artifact_id, rework_ref.artifact_revision)
++        )
++        assert rework.planning_revision == 2
++        assert {source.issue.issue_type for source in rework.issue_sources} == {"verifiability"}
++        assert controller.get_state("task-001").current_stage is Stage.PLANNING
++
+     def test_s2_unsupported_claim_do_not_use(self, tmp_path):
+         """S2: Unsupported capability returns BLOCKED, not pass."""
+         store, _ = _store_artifact(tmp_path)
+@@ -347,8 +525,8 @@ class TestScenarios:
+         assert result.outcome.value == "pass"
+         assert "syntax" in result.capabilities_checked
+ 
+-    def test_s2d_scanner_blocks_with_detector_findings(self, tmp_path):
+-        """S2d: Scanner blocks when detector finds issues."""
++    def test_s2d_scanner_fails_with_detector_findings(self, tmp_path):
++        """S2d: Scanner fails when a completed check finds issues."""
+         store, digest = _store_artifact(tmp_path)
+         scanner = ScannerGateway(artifact_store=store)
+ 
+@@ -373,7 +551,7 @@ class TestScenarios:
+             serializer_profile="rfc8785-jcs-sha256-v1",
+         )
+         result = scanner.scan_exact(ref, "repo-001", ("syntax",))
+-        assert result.outcome.value == "blocked"
++        assert result.outcome.value == "fail"
+         assert len(result.findings) > 0
+ 
+     def test_s2e_scanner_blocks_without_detector(self, tmp_path):
+diff --git a/tests/scanner/test_exact_digest.py b/tests/scanner/test_exact_digest.py
+index e1fed3a..50aec3c 100644
+--- a/tests/scanner/test_exact_digest.py
++++ b/tests/scanner/test_exact_digest.py
+@@ -98,11 +98,11 @@ class TestScannerGateway:
+         assert result.request_id
+ 
+     def test_scan_with_empty_capabilities(self):
+-        """SCN07: Scan with no requested capabilities passes."""
++        """SCN07: Empty coverage cannot establish a Scanner pass."""
+         gw = ScannerGateway()
+         ref = make_ref()
+         result = gw.scan_exact(ref, "repo-001", ())
+-        assert result.outcome == ScannerOutcome.PASS
++        assert result.outcome == ScannerOutcome.BLOCKED
+ 
+     def test_capability_ids_are_str_enum(self):
+         """SCN08: Scanner capability IDs are string enums."""
+diff --git a/tests/scanner/test_freeze.py b/tests/scanner/test_freeze.py
+index 28b1913..1ebd2d4 100644
+--- a/tests/scanner/test_freeze.py
++++ b/tests/scanner/test_freeze.py
+@@ -1,110 +1,154 @@
+-"""Specification freeze tests — FRZ01-FRZ15."""
++"""Freeze requires exact structural, Scanner, and approval evidence."""
+ 
+ import pytest
+-from pydantic import BaseModel
+-
+-from agent.runtime.artifact_store import ArtifactStore
+-from agent.runtime.receipt_store import ReceiptStore
+-from agent.runtime.specification_freezer import SpecificationFreezer
+-
+-
+-class SpecDataModel(BaseModel):
+-    spec_id: str = "test-spec"
+-    content: str = "test content"
+-
+-
+-class TestSpecificationFreezer:
+-    def test_freeze_creates_receipt(self, tmp_path):
+-        """FRZ01: Freeze creates a FreezeReceipt."""
+-        store = ArtifactStore(tmp_path)
+-        receipts = ReceiptStore(tmp_path)
+-        freezer = SpecificationFreezer(store, receipts)
+-
+-        receipt = freezer.freeze(
+-            candidate_model=SpecDataModel(),
+-            artifact_id="cand-001",
+-            revision=1,
+-            contract_id="planning",
+-            contract_version="1.0",
+-            scanner_receipt_id="scan-001",
+-            scanner_receipt_digest="5" * 64,
+-            repository_identity_ref="repo-001",
+-            authorization_receipt_id="auth-001",
+-            authorization_receipt_digest="a" * 64,
+-        )
+-        assert receipt.candidate_ref.artifact_id == "cand-001"
+-        assert receipt.frozen_ref.artifact_id == "frozen-cand-001"
+-
+-    def test_frozen_digest_matches_candidate(self, tmp_path):
+-        """FRZ02: Frozen digest matches candidate digest."""
+-        store = ArtifactStore(tmp_path)
+-        receipts = ReceiptStore(tmp_path)
+-        freezer = SpecificationFreezer(store, receipts)
+-
+-        receipt = freezer.freeze(
+-            candidate_model=SpecDataModel(),
+-            artifact_id="cand-001",
+-            revision=1,
+-            contract_id="planning",
+-            contract_version="1.0",
+-            scanner_receipt_id="scan-001",
+-            scanner_receipt_digest="5" * 64,
+-            repository_identity_ref="repo-001",
+-            authorization_receipt_id="auth-001",
+-            authorization_receipt_digest="a" * 64,
+-        )
+-        assert receipt.candidate_ref.artifact_digest == receipt.frozen_ref.artifact_digest
+-
+-    def test_freeze_receipt_has_scanner_ref(self, tmp_path):
+-        """FRZ03: Freeze receipt references scanner receipt."""
+-        store = ArtifactStore(tmp_path)
+-        receipts = ReceiptStore(tmp_path)
+-        freezer = SpecificationFreezer(store, receipts)
+-
+-        receipt = freezer.freeze(
+-            candidate_model=SpecDataModel(),
+-            artifact_id="cand-001",
+-            revision=1,
+-            contract_id="planning",
+-            contract_version="1.0",
+-            scanner_receipt_id="scan-rec-001",
+-            scanner_receipt_digest="5" * 64,
+-            repository_identity_ref="repo-001",
+-            authorization_receipt_id="auth-001",
+-            authorization_receipt_digest="a" * 64,
++
++from agent.contracts.scanner import ScannerFinding, ScannerOutcome
++from agent.runtime.controller import HostController, TransitionError
++from agent.runtime.scanner_check_registry import ScannerCheckRegistrySnapshot
++from agent.runtime.specification_freezer import FreezeError, SpecificationFreezer
++from tests.fixtures.scanner import passing_scan
++from tests.fixtures.structural_gap import FixturePayload, passing_gap
++
++
++def ready_freezer(tmp_path):
++    controller = HostController(tmp_path)
++    gap = passing_gap(controller)
++    scan = passing_scan(controller, gap)
++    candidate = gap.result.candidate_specification_ref
++    _, approval_digest = controller.receipt_store.issue_verified(
++        "approval-candidate", "host", f"approve-freeze:{candidate.artifact_digest}"
++    )
++    assert gap.completion_receipt_ref is not None
++    assert controller.scanner_checks is not None
++    args = dict(
++        candidate_model=FixturePayload(content="approved candidate"),
++        artifact_id=candidate.artifact_id,
++        revision=candidate.artifact_revision,
++        contract_id=candidate.contract_id,
++        contract_version=candidate.contract_version,
++        scanner_evidence=scan,
++        scanner_check_registry_ref=controller.scanner_checks.ref,
++        gap_result_ref=gap.result_ref,
++        gap_receipt_ref=gap.completion_receipt_ref,
++        task_id="task-001",
++        run_id="run-001",
++        repository_identity_ref="repo-001",
++        authorization_receipt_id="approval-candidate",
++        authorization_receipt_digest=approval_digest,
++    )
++    return SpecificationFreezer(controller.artifact_store, controller.receipt_store), args
++
++
++def test_freeze_creates_receipt_and_exact_frozen_copy(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    receipt = freezer.freeze(**args)
++    assert receipt.candidate_ref.artifact_id == "candidate"
++    assert receipt.frozen_ref.artifact_id == "frozen-candidate"
++    assert receipt.frozen_ref.artifact_digest == receipt.candidate_ref.artifact_digest
++    assert receipt.scanner_receipt_ref == args["scanner_evidence"].receipt_ref
++
++
++def test_freeze_rejects_changed_candidate_before_writing(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    args["candidate_model"] = FixturePayload(content="different candidate")
++    with pytest.raises(FreezeError, match="Planning gates"):
++        freezer.freeze(**args)
++    assert freezer._store.latest_revision("frozen-candidate") == 0
++
++
++def test_freeze_rejects_forged_scanner_receipt(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    scan = args["scanner_evidence"]
++    args["scanner_evidence"] = scan.model_copy(
++        update={"receipt_ref": scan.receipt_ref.model_copy(update={"receipt_digest": "f" * 64})}
++    )
++    with pytest.raises(FreezeError, match="Scanner pass receipt"):
++        freezer.freeze(**args)
++
++
++def test_freeze_rejects_unverified_approval(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    args["authorization_receipt_digest"] = "f" * 64
++    with pytest.raises(FreezeError, match="approval receipt"):
++        freezer.freeze(**args)
++
++
++def test_frozen_copy_cannot_be_overwritten(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    freezer.freeze(**args)
++    args["candidate_model"] = FixturePayload(content="v2")
++    with pytest.raises(FreezeError):
++        freezer.freeze(**args)
++
++
++def test_host_does_not_issue_pass_receipt_for_unchecked_capability(tmp_path):
++    controller = HostController(tmp_path)
++    gap = passing_gap(controller)
++    passing_scan(controller, gap)
++    controller.scanner._detectors.clear()  # simulate a missing registered detector
++    assert gap.completion_receipt_ref is not None
++    outcome = controller.scan_planning_candidate(
++        "task-001",
++        "run-001",
++        gap.result.candidate_specification_ref,
++        "repo-001",
++        ("syntax", "types"),
++        gap.result_ref,
++        gap.completion_receipt_ref,
++    )
++    assert outcome.result.outcome is ScannerOutcome.BLOCKED
++    assert outcome.result.capabilities_not_checked == ("syntax", "types")
++    assert outcome.evidence is None
++
++
++def test_host_rejects_partial_registry_coverage(tmp_path):
++    controller = HostController(tmp_path)
++    gap = passing_gap(controller)
++    passing_scan(controller, gap)
++    assert gap.completion_receipt_ref is not None
++    with pytest.raises(TransitionError, match="required registry checks"):
++        controller.scan_planning_candidate(
++            "task-001",
++            "run-001",
++            gap.result.candidate_specification_ref,
++            "repo-001",
++            (),
++            gap.result_ref,
++            gap.completion_receipt_ref,
+         )
+-        assert receipt.scanner_receipt_ref.receipt_id == "scan-rec-001"
+-
+-    def test_freeze_is_immutable(self, tmp_path):
+-        """FRZ04: Frozen artifact cannot be overwritten with different content."""
+-        store = ArtifactStore(tmp_path)
+-        receipts = ReceiptStore(tmp_path)
+-        freezer = SpecificationFreezer(store, receipts)
+-
+-        freezer.freeze(
+-            candidate_model=SpecDataModel(content="v1"),
+-            artifact_id="cand-001",
+-            revision=1,
+-            contract_id="planning",
+-            contract_version="1.0",
+-            scanner_receipt_id="scan-001",
+-            scanner_receipt_digest="5" * 64,
+-            repository_identity_ref="repo-001",
+-            authorization_receipt_id="auth-001",
+-            authorization_receipt_digest="a" * 64,
++
++
++def test_failed_check_persists_result_without_pass_receipt(tmp_path):
++    controller = HostController(tmp_path)
++    gap = passing_gap(controller)
++    passing_scan(controller, gap)
++    controller.scanner._detectors["syntax"] = lambda _: (
++        ScannerFinding(finding_id="failure-1", capability="syntax", severity="error", message="invalid syntax"),
++    )
++    assert gap.completion_receipt_ref is not None
++    result = controller.scan_planning_candidate(
++        "task-001",
++        "run-001",
++        gap.result.candidate_specification_ref,
++        "repo-001",
++        ("syntax", "types"),
++        gap.result_ref,
++        gap.completion_receipt_ref,
++    )
++    assert result.result.outcome is ScannerOutcome.FAIL
++    assert result.evidence is None
++    assert controller.artifact_store.get_verified(result.result_ref.artifact_id, 1)
++
++
++def test_empty_scanner_registry_is_invalid(tmp_path):
++    with pytest.raises(ValueError, match="at least 1 item"):
++        ScannerCheckRegistrySnapshot(
++            tool_registry_ref=ready_freezer(tmp_path)[1]["scanner_check_registry_ref"], checks=()
+         )
+-        from agent.runtime.artifact_store import DuplicateArtifactError
+-
+-        with pytest.raises(DuplicateArtifactError):
+-            freezer.freeze(
+-                candidate_model=SpecDataModel(content="v2"),
+-                artifact_id="cand-001",
+-                revision=1,  # same revision, different content
+-                contract_id="planning",
+-                contract_version="1.0",
+-                scanner_receipt_id="scan-002",
+-                scanner_receipt_digest="6" * 64,
+-                repository_identity_ref="repo-001",
+-                authorization_receipt_id="auth-002",
+-                authorization_receipt_digest="b" * 64,
+-            )
++
++
++def test_freeze_rejects_new_candidate_revision_with_old_scan(tmp_path):
++    freezer, args = ready_freezer(tmp_path)
++    args["revision"] = 2
++    with pytest.raises(FreezeError, match="Planning gates"):
++        freezer.freeze(**args)
+diff --git a/tests/test_gap_analysis.py b/tests/test_gap_analysis.py
+index a4f121a..0275d10 100644
+--- a/tests/test_gap_analysis.py
++++ b/tests/test_gap_analysis.py
+@@ -35,15 +35,24 @@ def test_missing_capability_reports_producer_symbol_and_consumer_gaps() -> None:
+     }
+ 
+ 
+-def test_current_repository_uses_canonical_gap_owner_and_finds_real_missing_capabilities() -> None:
++def test_current_repository_closes_the_accepted_capability_set() -> None:
+     result = audit_repository(".")
+-    gaps_by_capability = {gap.capability_id for gap in result.gaps}
+-
+-    assert "gap_analysis_owner" not in gaps_by_capability
+-    assert "reference_closure" not in gaps_by_capability
+-    assert "execution_trace" not in gaps_by_capability
+-    assert "scanner_check_registry" in gaps_by_capability
+-    assert "runtime_root_registry" in gaps_by_capability
+-    assert "recovery_readiness" in gaps_by_capability
+-    assert "wave_preimage_pinning" in gaps_by_capability
+-    assert result.diagnostic_status is DiagnosticStatus.NOT_VALID
++    assert result.gaps == ()
++    assert result.diagnostic_status is DiagnosticStatus.VALID
++
++
++def test_missing_producer_file_still_detected_from_synthetic_snapshot() -> None:
++    requirements = (
++        CapabilityRequirement(
++            capability_id="scanner_check_registry",
++            producers=(
++                CapabilityProducer(path="agent/runtime/scanner_check_registry.py", symbols=("ScannerCheckRegistry",)),
++            ),
++        ),
++    )
++    result = MissingCapabilityAnalyzer().analyze(
++        RepositorySnapshot(source_id="fixture:missing", files={}), requirements
++    )
++    assert [(gap.kind, gap.path) for gap in result.gaps] == [
++        ("missing_producer", "agent/runtime/scanner_check_registry.py")
++    ]
+diff --git a/tests/test_workflows.py b/tests/test_workflows.py
+index b0b5ded..d3b81b4 100644
+--- a/tests/test_workflows.py
++++ b/tests/test_workflows.py
+@@ -15,17 +15,19 @@ STAGES = (
+     "planning",
+     "fixture_validation",
+     "build",
+-    "build_validation",
+ )
+ 
+ 
+-def test_single_workflow_contract_parses_and_has_all_six_roles() -> None:
++def test_single_workflow_contract_has_five_stages_and_internal_build_verifier() -> None:
+     assert CONTRACT.is_file()
+     assert not list(Path("agent/workflows/stages").glob("*.yaml"))
+     bundle = load_workflow_bundle(CONTRACT)
+     assert tuple(bundle["role_workflows"]) == STAGES
+     assert len(bundle["host_workflows"]) == 22
+     assert all(stage in bundle["role_workflows"] for stage in STAGES)
++    verification = bundle["role_workflows"]["build"]["workflow"]["independent_verification"]
++    assert verification["stage"] == "build"
++    assert verification["workflow"]["role_id"] == "build_verifier"
+     for stage in STAGES:
+         role = load_stage_workflow(CONTRACT, stage)["workflow"]
+         assert role["input_schema"]["additionalProperties"] is False
+@@ -60,6 +62,7 @@ def _bad_contract(tmp_path: Path, edit) -> Path:
+         lambda d: d["role_workflows"]["build"]["workflow"]["request_result_exchange"].update(
+             build_admission_precedes_execution=False
+         ),
++        lambda d: d["role_workflows"]["build"]["workflow"].pop("independent_verification"),
+         lambda d: d["host_workflows"].pop("structural_gap_analysis"),
+         lambda d: d["host_workflows"]["structural_gap_analysis"]["input_contracts"].remove("candidate_specification"),
+         lambda d: d["host_workflows"]["structural_gap_analysis"]["required_work"].remove("run_walking_skeleton"),

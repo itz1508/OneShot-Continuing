@@ -1,0 +1,284 @@
+{
+  "generatedAt": "2026-11-05T01:51:54.907Z",
+  "currentSourceCommit": "3d2f3190c89d83ac1e3516199eb884de2f19e0f6",
+  "referenceSourceCommit": "d10ae4dc6b4b539ca43586dbeaf86c894591e3f8",
+  "evidenceBoundary": "verification.json validates the simulated browser demo and its real Chromium captures; it does not certify current-HEAD backend execution. Reference frames depict API-backed live.html at the reference commit only.",
+  "status": "passed",
+  "summary": {
+    "scenarios": 12,
+    "totalActions": 75,
+    "manifestScreenshots": 55,
+    "dimensionOk": 55,
+    "hashOk": 55,
+    "duplicates": 0,
+    "referenceCaptures": [
+      "original-01-live-initial.png",
+      "original-02-request-typed.png",
+      "original-03-after-submit.png"
+    ],
+    "recordings": 12,
+    "traces": 12
+  },
+  "checks": [
+    {
+      "name": "scenarios count is 12",
+      "pass": true,
+      "detail": "12"
+    },
+    {
+      "name": "S01 has >= 4 actions",
+      "pass": true,
+      "detail": "5 actions"
+    },
+    {
+      "name": "S02 has >= 5 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S03 has >= 6 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S04 has >= 6 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S05 has >= 6 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S06 has >= 6 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S07 has >= 5 actions",
+      "pass": true,
+      "detail": "5 actions"
+    },
+    {
+      "name": "S08 has >= 8 actions",
+      "pass": true,
+      "detail": "8 actions"
+    },
+    {
+      "name": "S09 has >= 6 actions",
+      "pass": true,
+      "detail": "9 actions"
+    },
+    {
+      "name": "S10 has >= 7 actions",
+      "pass": true,
+      "detail": "7 actions"
+    },
+    {
+      "name": "S11 has >= 6 actions",
+      "pass": true,
+      "detail": "6 actions"
+    },
+    {
+      "name": "S12 has >= 5 actions",
+      "pass": true,
+      "detail": "5 actions"
+    },
+    {
+      "name": "total actions >= 60",
+      "pass": true,
+      "detail": "75"
+    },
+    {
+      "name": "manifest has >= 30 screenshots",
+      "pass": true,
+      "detail": "55"
+    },
+    {
+      "name": "manifest has at least 40 screenshots",
+      "pass": true,
+      "detail": "55"
+    },
+    {
+      "name": "manifest has no more than 60 screenshots",
+      "pass": true,
+      "detail": "55"
+    },
+    {
+      "name": "manifest covers every declared checkpoint",
+      "pass": true,
+      "detail": "55/55"
+    },
+    {
+      "name": "manifest file set exactly matches scenarios.json checkpoints",
+      "pass": true,
+      "detail": "55/55"
+    },
+    {
+      "name": "all screenshots are 1920x1080 PNG",
+      "pass": true,
+      "detail": "55/55"
+    },
+    {
+      "name": "all SHA-256 match manifest",
+      "pass": true,
+      "detail": "55/55"
+    },
+    {
+      "name": "no duplicate screenshots",
+      "pass": true,
+      "detail": "0 duplicates"
+    },
+    {
+      "name": "real-backend reference captures present",
+      "pass": true,
+      "detail": "original-01-live-initial.png, original-02-request-typed.png, original-03-after-submit.png"
+    },
+    {
+      "name": "12 scenario recordings exist",
+      "pass": true,
+      "detail": "12 webm"
+    },
+    {
+      "name": "recording non-trivial S01-recording.webm",
+      "pass": true,
+      "detail": "991236 bytes"
+    },
+    {
+      "name": "recording non-trivial S02-recording.webm",
+      "pass": true,
+      "detail": "1412513 bytes"
+    },
+    {
+      "name": "recording non-trivial S03-recording.webm",
+      "pass": true,
+      "detail": "2400424 bytes"
+    },
+    {
+      "name": "recording non-trivial S04-recording.webm",
+      "pass": true,
+      "detail": "3207068 bytes"
+    },
+    {
+      "name": "recording non-trivial S05-recording.webm",
+      "pass": true,
+      "detail": "7645018 bytes"
+    },
+    {
+      "name": "recording non-trivial S06-recording.webm",
+      "pass": true,
+      "detail": "10365966 bytes"
+    },
+    {
+      "name": "recording non-trivial S07-recording.webm",
+      "pass": true,
+      "detail": "13802033 bytes"
+    },
+    {
+      "name": "recording non-trivial S08-recording.webm",
+      "pass": true,
+      "detail": "24618348 bytes"
+    },
+    {
+      "name": "recording non-trivial S09-recording.webm",
+      "pass": true,
+      "detail": "6254307 bytes"
+    },
+    {
+      "name": "recording non-trivial S10-recording.webm",
+      "pass": true,
+      "detail": "21091999 bytes"
+    },
+    {
+      "name": "recording non-trivial S11-recording.webm",
+      "pass": true,
+      "detail": "22463036 bytes"
+    },
+    {
+      "name": "recording non-trivial S12-recording.webm",
+      "pass": true,
+      "detail": "17415112 bytes"
+    },
+    {
+      "name": "12 scenario traces exist",
+      "pass": true,
+      "detail": "12 zip"
+    },
+    {
+      "name": "trace non-trivial S01-trace.zip",
+      "pass": true,
+      "detail": "6682275 bytes"
+    },
+    {
+      "name": "trace non-trivial S02-trace.zip",
+      "pass": true,
+      "detail": "9333227 bytes"
+    },
+    {
+      "name": "trace non-trivial S03-trace.zip",
+      "pass": true,
+      "detail": "19391302 bytes"
+    },
+    {
+      "name": "trace non-trivial S04-trace.zip",
+      "pass": true,
+      "detail": "18673329 bytes"
+    },
+    {
+      "name": "trace non-trivial S05-trace.zip",
+      "pass": true,
+      "detail": "26646008 bytes"
+    },
+    {
+      "name": "trace non-trivial S06-trace.zip",
+      "pass": true,
+      "detail": "38030247 bytes"
+    },
+    {
+      "name": "trace non-trivial S07-trace.zip",
+      "pass": true,
+      "detail": "37063936 bytes"
+    },
+    {
+      "name": "trace non-trivial S08-trace.zip",
+      "pass": true,
+      "detail": "83042140 bytes"
+    },
+    {
+      "name": "trace non-trivial S09-trace.zip",
+      "pass": true,
+      "detail": "23277734 bytes"
+    },
+    {
+      "name": "trace non-trivial S10-trace.zip",
+      "pass": true,
+      "detail": "65095652 bytes"
+    },
+    {
+      "name": "trace non-trivial S11-trace.zip",
+      "pass": true,
+      "detail": "55120876 bytes"
+    },
+    {
+      "name": "trace non-trivial S12-trace.zip",
+      "pass": true,
+      "detail": "46688644 bytes"
+    },
+    {
+      "name": "no secret-like strings in demo inputs/manifest",
+      "pass": true,
+      "detail": "0 hits"
+    },
+    {
+      "name": "SIMULATED labeling present in demo",
+      "pass": true,
+      "detail": "badge + labels"
+    }
+  ],
+  "failures": [],
+  "notChecked": [
+    "Muse Image 1.0 artwork (not used — optional per spec)",
+    "Cosmos 3 motion (not used — optional per spec)"
+  ]
+}

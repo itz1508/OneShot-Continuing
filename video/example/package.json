@@ -1,0 +1,14 @@
+{
+  "name": "oneshot-video-example",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "OneShot interactive HTML demo + Playwright capture suite. All workflow events in the demo are SIMULATED fixtures; screenshots/recordings/traces are real Chromium captures of that demo. Real-backend reference captures live in screenshots/reference/.",
+  "scripts": {
+    "serve": "node serve.mjs",
+    "capture": "node capture.mjs",
+    "verify": "node verify-capture.mjs",
+    "test": "node ../../web/node_modules/@playwright/test/cli.js test -c playwright.config.js"
+  },
+  "comment": "Playwright is resolved from ../../web/node_modules (@playwright/test ^1.58.0) so no extra install is required."
+}

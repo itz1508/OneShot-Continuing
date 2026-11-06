@@ -23,41 +23,25 @@ class EventStore:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS events (
                     seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event_id TEXT UNIQUE,
                     task_id TEXT NOT NULL,
                     event_type TEXT NOT NULL,
                     event_data TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT (datetime('now'))
                 )
             """)
-            columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
-            if "event_id" not in columns:
-                conn.execute("ALTER TABLE events ADD COLUMN event_id TEXT")
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_identity ON events(event_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id)")
             conn.commit()
         finally:
             conn.close()
 
-    def append(self, task_id: str, event_type: str, event_data: str, *, event_id: str | None = None) -> int:
-        """Append a lifecycle event; keyed retries return the original sequence."""
+    def append(self, task_id: str, event_type: str, event_data: str) -> int:
+        """Append an event. Returns the sequence number."""
         conn = sqlite3.connect(str(self.db_path))
         try:
             conn.execute("BEGIN IMMEDIATE")
-            if event_id is not None:
-                if not event_id:
-                    raise ValueError("event_id must not be empty")
-                existing = conn.execute(
-                    "SELECT seq, task_id, event_type, event_data FROM events WHERE event_id = ?", (event_id,)
-                ).fetchone()
-                if existing is not None:
-                    if existing[1:] != (task_id, event_type, event_data):
-                        raise ValueError(f"conflicting lifecycle event: {event_id}")
-                    conn.execute("COMMIT")
-                    return int(existing[0])
             cursor = conn.execute(
-                "INSERT INTO events (event_id, task_id, event_type, event_data) VALUES (?, ?, ?, ?)",
-                (event_id, task_id, event_type, event_data),
+                "INSERT INTO events (task_id, event_type, event_data) VALUES (?, ?, ?)",
+                (task_id, event_type, event_data),
             )
             conn.execute("COMMIT")
             return cursor.lastrowid or 0
@@ -72,13 +56,10 @@ class EventStore:
         conn = sqlite3.connect(str(self.db_path))
         try:
             rows = conn.execute(
-                "SELECT seq, event_type, event_data, created_at, event_id FROM events WHERE task_id = ? ORDER BY seq",
+                "SELECT seq, event_type, event_data, created_at FROM events WHERE task_id = ? ORDER BY seq",
                 (task_id,),
             ).fetchall()
-            return [
-                {"seq": r[0], "event_type": r[1], "event_data": r[2], "created_at": r[3], "event_id": r[4]}
-                for r in rows
-            ]
+            return [{"seq": r[0], "event_type": r[1], "event_data": r[2], "created_at": r[3]} for r in rows]
         finally:
             conn.close()
 

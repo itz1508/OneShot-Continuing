@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["source_id", "task_id", "thread_id", "name", "sha256", "size", "object_name"],
+  "properties": {
+    "source_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "name": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "size": {"type": "integer", "minimum": 0},
+    "object_name": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

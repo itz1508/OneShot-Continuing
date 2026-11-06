@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["source_id", "sha256", "start_byte", "end_byte", "source_size", "content", "complete_source", "truncated"],
+  "properties": {
+    "source_id": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "start_byte": {"type": "integer", "minimum": 0},
+    "end_byte": {"type": "integer", "minimum": 0},
+    "source_size": {"type": "integer", "minimum": 0},
+    "content": {"type": "string"},
+    "complete_source": {"type": "boolean"},
+    "truncated": {"type": "boolean"}
+  }
+}

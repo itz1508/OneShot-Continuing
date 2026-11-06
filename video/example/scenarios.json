@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "title": "OneShot Interactive Demo Scenarios",
+    "classification": "SIMULATED",
+    "note": "All workflow events, task IDs, findings, and tool results in this demo are deterministic simulated fixtures rendered by demo.js in the browser. No real OneShot backend is called by the demo page. Real-backend evidence is stored separately under screenshots/reference/ (captured from the live app on http://127.0.0.1:8000).",
+    "viewport": { "width": 1920, "height": 1080 },
+    "taskId": "a3f9c1e84b2d4f6a9e0c5b7d1a2f3e4c",
+    "stages": ["Intake", "Research", "Audit", "Planning", "Fixture Validation", "Build Admission", "Build", "Verification"]
+  },
+  "scenarios": [
+    {
+      "id": "S01",
+      "title": "OneShot startup and System Chat",
+      "classification": "SIMULATED",
+      "initialState": "Clean reset: empty transcript with OneShot empty state, no task, MCP disconnected.",
+      "actions": [
+        { "n": 1, "op": "assertVisible", "target": "#transcript", "interaction": "waitFor", "expected": "Empty state 'What should OneShot look into?' is visible", "checkpoint": true, "shot": "initial-screen", "args": { "text": "What should OneShot look into?" } },
+        { "n": 2, "op": "fillComposer", "target": "#promptInput", "interaction": "fill", "expected": "Composer contains the typed audit request and Send enables", "checkpoint": true, "shot": "request-typed", "args": { "text": "Audit the agent package for security issues and plan the fixes" } },
+        { "n": 3, "op": "setPurpose", "target": "#purposeSelect", "interaction": "selectOption", "expected": "Capability switches from Research to Audit", "args": { "value": "audit" } },
+        { "n": 4, "op": "submit", "target": "#sendBtn", "interaction": "click", "expected": "User message appears, host creates task a3f9c1e8…, Task Summary populates", "fixture": "taskId a3f9c1e84b2d4f6a9e0c5b7d1a2f3e4c, purpose audit", "checkpoint": true, "shot": "request-submitted" },
+        { "n": 5, "op": "assertVisible", "target": "#statTaskId", "interaction": "waitFor", "expected": "Task ID a3f9c1e8… is visible in Task Summary", "checkpoint": true, "shot": "task-created", "args": { "text": "a3f9c1e8" } }
+      ]
+    },
+    {
+      "id": "S02",
+      "title": "Submit repository analysis request",
+      "classification": "SIMULATED",
+      "initialState": "Clean reset: no task loaded.",
+      "actions": [
+        { "n": 1, "op": "fillComposer", "target": "#promptInput", "interaction": "fill", "expected": "Research request typed into System Chat composer", "args": { "text": "Research the OneShot repository: map the agent package, providers, and host gates" } },
+        { "n": 2, "op": "setPurpose", "target": "#purposeSelect", "interaction": "selectOption", "expected": "Capability is Research", "args": { "value": "research" } },
+        { "n": 3, "op": "submit", "target": "#sendBtn", "interaction": "click", "expected": "Task created; execution shows awaiting_mcp; input artifact persisted rev 1", "fixture": "task_input.md rev 1 = submitted prompt", "checkpoint": true, "shot": "request-submitted" },
+        { "n": 4, "op": "hostAccept", "target": "#transcript", "interaction": "waitFor", "expected": "Host message confirms frozen input and next action; task_created event in Evidence Stream", "checkpoint": true, "shot": "host-accepted" },
+        { "n": 5, "op": "assertVisible", "target": "#runBtn", "interaction": "waitFor", "expected": "'Run Research' action is available", "checkpoint": true, "shot": "run-enabled", "args": { "text": "Run Research" } },
+        { "n": 6, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "Review artifact modal opens showing the editable task input", "checkpoint": true, "shot": "input-artifact-open", "args": { "name": "task_input.md" } }
+      ]
+    },
+    {
+      "id": "S03",
+      "title": "Research execution and evidence",
+      "classification": "SIMULATED",
+      "initialState": "Task a3f9c1e8… (research) created, awaiting MCP.",
+      "actions": [
+        { "n": 1, "op": "assertVisible", "target": "#runBtn", "interaction": "waitFor", "expected": "Run Research action is enabled for the created task", "checkpoint": true, "shot": "research-started", "args": { "text": "Run Research" } },
+        { "n": 2, "op": "streamResearch", "target": "#transcript", "interaction": "waitFor", "expected": "Researcher worker shows typing indicator, then streams evidence with findings chips", "fixture": "4 evidence findings: providers.py, host.py, tools.py, config.yaml", "checkpoint": true, "shot": "research-streaming" },
+        { "n": 3, "op": "evidenceEvent", "target": "#eventList", "interaction": "waitFor", "expected": "research_evidence events appear in Evidence Stream with sequence numbers", "checkpoint": true, "shot": "research-evidence" },
+        { "n": 4, "op": "assertVisible", "target": "#statExecution", "interaction": "waitFor", "expected": "Execution shows research_completed", "args": { "text": "research_completed" } },
+        { "n": 5, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "task_research.json opens read-only with evidence and acceptance criteria", "fixture": "task_research.json rev 1", "checkpoint": true, "shot": "research-artifact", "args": { "name": "task_research.json" } },
+        { "n": 6, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Artifact modal closes, transcript focused" }
+      ]
+    },
+    {
+      "id": "S04",
+      "title": "Audit Discovery and source inspection",
+      "classification": "SIMULATED",
+      "initialState": "Research completed; audit can run.",
+      "actions": [
+        { "n": 1, "op": "switchToAudit", "target": "#purposeSelect", "interaction": "selectOption", "expected": "Follow-up audit request typed; purpose set to Audit", "args": { "text": "Now audit the agent package read-only and record CodeIntent candidates" } },
+        { "n": 2, "op": "submitFollowup", "target": "#sendBtn", "interaction": "click", "expected": "User follow-up message appears in transcript", "checkpoint": true, "shot": "audit-requested" },
+        { "n": 3, "op": "runAudit", "target": "#transcript", "interaction": "waitFor", "expected": "Audit worker inspects agent/providers.py, agent/host.py, agent/tools.py with severity findings", "fixture": "3 findings: high shell execution, medium secret handling, low error detail", "checkpoint": true, "shot": "audit-inspection" },
+        { "n": 4, "op": "stageDone", "target": "#stageBar", "interaction": "waitFor", "expected": "Audit stage chip turns done; audit_completed event recorded" },
+        { "n": 5, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "task_audit.json opens with findings and CodeIntent candidates", "fixture": "task_audit.json rev 1 — read-only discovery", "checkpoint": true, "shot": "audit-findings", "args": { "name": "task_audit.json" } },
+        { "n": 6, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; findings remain visible in transcript" }
+      ]
+    },
+    {
+      "id": "S05",
+      "title": "Planning and TODO creation",
+      "classification": "SIMULATED",
+      "initialState": "Audit completed with 3 findings.",
+      "actions": [
+        { "n": 1, "op": "planStart", "target": "#transcript", "interaction": "waitFor", "expected": "Planner message: converting audit CodeIntent into a BuildSpecification", "checkpoint": true, "shot": "planning-started" },
+        { "n": 2, "op": "todosAppear", "target": "#todoList", "interaction": "waitFor", "expected": "PLAN TODOs panel appears in Task Summary with 4 pending items", "fixture": "TODO-1..4: sandbox tool identity, secret redaction, digest pinning, completed_at ordering", "checkpoint": true, "shot": "todo-created" },
+        { "n": 3, "op": "todoProgress", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-1 in-progress, then TODO-1 and TODO-2 complete with check transitions", "checkpoint": true, "shot": "todo-processing" },
+        { "n": 4, "op": "planFreezeMsg", "target": "#transcript", "interaction": "waitFor", "expected": "Host message: BuildSpec drafted and frozen by host (Planner cannot freeze)" },
+        { "n": 5, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "build_spec.json opens with 4 admitted candidate actions and acceptance checks", "fixture": "build_spec.json rev 1 — frozen", "checkpoint": true, "shot": "buildspec-frozen", "args": { "name": "build_spec.json" } },
+        { "n": 6, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; Planning stage done" }
+      ]
+    },
+    {
+      "id": "S06",
+      "title": "Fixture validation rejection and correction",
+      "classification": "SIMULATED",
+      "initialState": "BuildSpec frozen; fixture validation pending.",
+      "actions": [
+        { "n": 1, "op": "validateStart", "target": "#transcript", "interaction": "waitFor", "expected": "Fixture Validator starts independent checks against the frozen spec", "checkpoint": true, "shot": "validation-started" },
+        { "n": 2, "op": "validateReject", "target": "#alertBox", "interaction": "waitFor", "expected": "Validation REJECTED: TODO-3 tool digest missing from ToolRegistrySnapshot; warning banner and failed stage chip", "fixture": "fixture_report.json verdict rejected — missing provenance is a blocker", "checkpoint": true, "shot": "validation-rejected" },
+        { "n": 3, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "fixture_report.json shows the rejection reason and required correction", "checkpoint": true, "shot": "rejection-detail", "args": { "name": "fixture_report.json" } },
+        { "n": 4, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; correction action offered" },
+        { "n": 5, "op": "correctSpec", "target": "#transcript", "interaction": "waitFor", "expected": "Planner pins digest sha256:9f2c…e41a from host snapshot; build_spec.json rev 2; TODO-3 unblocked", "checkpoint": true, "shot": "spec-corrected" },
+        { "n": 6, "op": "revalidate", "target": "#transcript", "interaction": "waitFor", "expected": "Re-validation PASSED; validation stage done; correction event in Evidence Stream", "checkpoint": true, "shot": "validation-passed" }
+      ]
+    },
+    {
+      "id": "S07",
+      "title": "Build Admission and authorization",
+      "classification": "SIMULATED",
+      "initialState": "Fixture validation passed; build not yet admitted.",
+      "actions": [
+        { "n": 1, "op": "admissionStart", "target": "#transcript", "interaction": "waitFor", "expected": "Host evaluates admission gates: authorization, digests, sandbox profile (default-deny)", "checkpoint": true, "shot": "admission-checking" },
+        { "n": 2, "op": "admissionDeny", "target": "#transcript", "interaction": "waitFor", "expected": "Builder direct run attempt denied — arbitrary tool strings do not grant execution", "checkpoint": true, "shot": "admission-denied" },
+        { "n": 3, "op": "admissionGrant", "target": "#transcript", "interaction": "waitFor", "expected": "Host admits 4 actions from the frozen spec; admitted tool IDs derived by host only" },
+        { "n": 4, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "admission_receipt.json lists admitted actions, tool IDs, sandbox profile, authorization gate pass", "fixture": "admission_receipt.json — host-issued", "checkpoint": true, "shot": "admission-granted", "args": { "name": "admission_receipt.json" } },
+        { "n": 5, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; 'Run Build' enabled", "checkpoint": true, "shot": "build-ready" }
+      ]
+    },
+    {
+      "id": "S08",
+      "title": "Build processing and tool execution",
+      "classification": "SIMULATED",
+      "initialState": "Build admitted; 4 TODOs pending execution.",
+      "actions": [
+        { "n": 1, "op": "buildStart", "target": "#transcript", "interaction": "waitFor", "expected": "Build starts; worker announces execution; progress bar appears at 0%", "checkpoint": true, "shot": "build-started" },
+        { "n": 2, "op": "buildTodo1", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-1 executing: host rechecks tool identity + digest before sandbox run; progress 25%", "checkpoint": true, "shot": "build-todo1" },
+        { "n": 3, "op": "buildTodo2", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-2 executing: secret redaction check; progress 50%", "checkpoint": true, "shot": "build-todo2" },
+        { "n": 4, "op": "buildTodo3", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-3 executing: pinned digest verified sha256:9f2c…e41a; progress 75%" },
+        { "n": 5, "op": "buildTodo4", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-4 executing: completed_at ordering fix; progress 92%", "checkpoint": true, "shot": "build-processing" },
+        { "n": 6, "op": "buildArtifacts", "target": "#artifactList", "interaction": "waitFor", "expected": "build_result.json persisted; Build stage done; execution build_completed" },
+        { "n": 7, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "build_result.json shows 4/4 actions succeeded with tool receipts", "fixture": "build_result.json rev 1", "checkpoint": true, "shot": "build-result", "args": { "name": "build_result.json" } },
+        { "n": 8, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; progress 100%" }
+      ]
+    },
+    {
+      "id": "S09",
+      "title": "MCP/API connection and error handling",
+      "classification": "SIMULATED",
+      "initialState": "Task exists; MCP and Model both show disconnected.",
+      "actions": [
+        { "n": 1, "op": "openSettings", "target": "#btnSettings", "interaction": "click", "expected": "Connection settings dialog opens with MCP CONNECTION and MODEL API CONFIGURATION sections (SIMULATED)", "checkpoint": true, "shot": "settings-open" },
+        { "n": 2, "op": "fillEndpoint", "target": "#mcpUrl", "interaction": "fill", "expected": "Invalid MCP server URL entered: https://mcp.example.invalid/mcp with Authentication type None", "args": { "value": "https://mcp.example.invalid/mcp" }, "checkpoint": true, "shot": "endpoint-invalid" },
+        { "n": 3, "op": "testFail", "target": "#btnTestMcp", "interaction": "click", "expected": "MCP test failed message and connector error appear; discovered tools stay empty", "checkpoint": true, "shot": "connection-failed" },
+        { "n": 4, "op": "fixEndpoint", "target": "#mcpUrl", "interaction": "fill", "expected": "MCP server URL corrected to http://127.0.0.1:9234/mcp for the supported HTTP transport", "args": { "value": "http://127.0.0.1:9234/mcp" }, "checkpoint": true, "shot": "endpoint-corrected" },
+        { "n": 5, "op": "testOk", "target": "#btnTestMcp", "interaction": "click", "expected": "MCP test passed: 2 tools discovered — oneshot_research and source_lookup — and the MCP status becomes connected" },
+        { "n": 6, "op": "connectMcp", "target": "#btnConnectMcp", "interaction": "click", "expected": "MCP connected: 2 tools discovered; the topbar MCP status changes to MCP connected", "checkpoint": true, "shot": "mcp-connected" },
+        { "n": 7, "op": "configureModel", "target": "#modelBaseUrl", "interaction": "fill", "expected": "Model API fields are completed with the demo base URL and model ID; the password field is intentionally left empty", "args": { "baseUrl": "https://api.example.test/v1", "modelId": "demo-model" }, "checkpoint": true, "shot": "model-configured" },
+        { "n": 8, "op": "testModel", "target": "#btnTestModel", "interaction": "click", "expected": "Model test passed: provider-ready; Provider response: provider-ready appears and the secret field is cleared", "checkpoint": true, "shot": "model-tested" },
+        { "n": 9, "op": "saveModel", "target": "#btnSaveModel", "interaction": "click", "expected": "Model settings saved; Saved values shows demo-model and the base URL while the dialog remains open for review", "checkpoint": true, "shot": "settings-saved" }
+      ]
+    },
+    {
+      "id": "S10",
+      "title": "Interrupted execution and recovery",
+      "classification": "SIMULATED",
+      "initialState": "Build running at ~50%.",
+      "actions": [
+        { "n": 1, "op": "interruptStart", "target": "#transcript", "interaction": "waitFor", "expected": "Build attempt re-running; TODO-1 and TODO-2 complete; progress 50%", "checkpoint": true, "shot": "build-running" },
+        { "n": 2, "op": "interruptFail", "target": "#alertBox", "interaction": "waitFor", "expected": "Sandbox worker disconnects mid-TODO-3; progress bar failed; error banner; execution interrupted", "checkpoint": true, "shot": "execution-interrupted" },
+        { "n": 3, "op": "assertVisible", "target": "#statExecution", "interaction": "waitFor", "expected": "Execution status shows interrupted", "args": { "text": "interrupted" } },
+        { "n": 4, "op": "recoverMsg", "target": "#transcript", "interaction": "waitFor", "expected": "Host recovery message: checkpoint persisted for TODO-1/2; TODO-3 safe to resume; no partial effects", "checkpoint": true, "shot": "recovery-state" },
+        { "n": 5, "op": "resumeBuild", "target": "#transcript", "interaction": "waitFor", "expected": "Resume requested; host re-verifies admission and checkpoint before resuming", "checkpoint": true, "shot": "resume-requested" },
+        { "n": 6, "op": "resumeProgress", "target": "#todoList", "interaction": "waitFor", "expected": "TODO-3 resumes and completes; TODO-4 completes; progress 100%", "checkpoint": true, "shot": "recovery-progress" },
+        { "n": 7, "op": "assertVisible", "target": "#statExecution", "interaction": "waitFor", "expected": "Execution shows build_completed after recovery", "checkpoint": true, "shot": "recovered-complete", "args": { "text": "build_completed" } }
+      ]
+    },
+    {
+      "id": "S11",
+      "title": "Independent verification",
+      "classification": "SIMULATED",
+      "initialState": "Build completed; verifier independent of builder.",
+      "actions": [
+        { "n": 1, "op": "verifyStart", "target": "#transcript", "interaction": "waitFor", "expected": "Build Verifier starts real E2E checks against acceptance criteria (no self-certification)", "checkpoint": true, "shot": "verification-started" },
+        { "n": 2, "op": "verifyChecks", "target": "#transcript", "interaction": "waitFor", "expected": "Checks stream in: sandbox argv without shell ✓, digest recheck ✓, secret redaction ✓", "checkpoint": true, "shot": "verification-checks" },
+        { "n": 3, "op": "verifyFailOne", "target": "#transcript", "interaction": "waitFor", "expected": "One check flagged: event ordering assertion pending re-run; verifier requests fresh observation", "checkpoint": true, "shot": "verification-warning" },
+        { "n": 4, "op": "verifyRerun", "target": "#transcript", "interaction": "waitFor", "expected": "Ordered event replay re-run passes; all 6 acceptance criteria green" },
+        { "n": 5, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "verification_report.json shows 6/6 criteria passed with independent observations", "fixture": "verification_report.json rev 1", "checkpoint": true, "shot": "verification-report", "args": { "name": "verification_report.json" } },
+        { "n": 6, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes; Verification stage done" }
+      ]
+    },
+    {
+      "id": "S12",
+      "title": "Final artifact review and completion",
+      "classification": "SIMULATED",
+      "initialState": "All stages complete; artifacts persisted.",
+      "actions": [
+        { "n": 1, "op": "finalSummary", "target": "#transcript", "interaction": "waitFor", "expected": "Completion message: workflow complete, 8/8 stage chips done, artifact snapshot listed", "checkpoint": true, "shot": "completion-message" },
+        { "n": 2, "op": "openArtifact", "target": ".artifact-row", "interaction": "click", "expected": "task_summary.json opens: final overview of task, stages, artifacts, verification verdict", "fixture": "task_summary.json rev 1", "checkpoint": true, "shot": "final-overview", "args": { "name": "task_summary.json" } },
+        { "n": 3, "op": "closeModal", "target": "#modalClose", "interaction": "click", "expected": "Modal closes" },
+        { "n": 4, "op": "hoverArtifact", "target": "#artifactList", "interaction": "hover", "expected": "Hover highlights the artifact panel; the latest 8 of 9 artifact rows are visible (panel cap) and the summary artifact is present", "checkpoint": true, "shot": "artifact-snapshot" },
+        { "n": 5, "op": "assertVisible", "target": "#stageBar", "interaction": "waitFor", "expected": "Final state: execution completed_verified, all stages done — observable completion", "checkpoint": true, "shot": "final-state", "args": { "text": "Verification" } }
+      ]
+    }
+  ]
+}

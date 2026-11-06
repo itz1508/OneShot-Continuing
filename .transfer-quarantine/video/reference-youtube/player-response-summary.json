@@ -1,0 +1,101 @@
+{
+  "playable": "OK",
+  "reason": "",
+  "videoId": "5MxKXDzl-SI",
+  "lengthSeconds": "180",
+  "formats": [
+    {
+      "itag": 136,
+      "mimeType": "video/mp4; codecs=\"avc1.64001F\"",
+      "quality": "hd720",
+      "qualityLabel": "720p",
+      "width": 1152,
+      "height": 720,
+      "bitrate": 99980,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 398,
+      "mimeType": "video/mp4; codecs=\"av01.0.05M.08.0.110.05.01.06.0\"",
+      "quality": "hd720",
+      "qualityLabel": "720p",
+      "width": 1152,
+      "height": 720,
+      "bitrate": 58100,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 397,
+      "mimeType": "video/mp4; codecs=\"av01.0.04M.08.0.110.05.01.06.0\"",
+      "quality": "large",
+      "qualityLabel": "480p",
+      "width": 768,
+      "height": 480,
+      "bitrate": 34810,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 134,
+      "mimeType": "video/mp4; codecs=\"avc1.4D4016\"",
+      "quality": "medium",
+      "qualityLabel": "360p",
+      "width": 576,
+      "height": 360,
+      "bitrate": 37910,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 243,
+      "mimeType": "video/webm; codecs=\"vp9\"",
+      "quality": "medium",
+      "qualityLabel": "360p",
+      "width": 576,
+      "height": 360,
+      "bitrate": 30969,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 395,
+      "mimeType": "video/mp4; codecs=\"av01.0.00M.08.0.110.05.01.06.0\"",
+      "quality": "small",
+      "qualityLabel": "240p",
+      "width": 384,
+      "height": 240,
+      "bitrate": 12413,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 160,
+      "mimeType": "video/mp4; codecs=\"avc1.4D400B\"",
+      "quality": "tiny",
+      "qualityLabel": "144p",
+      "width": 230,
+      "height": 144,
+      "bitrate": 12788,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 140,
+      "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+      "quality": "tiny",
+      "bitrate": 131963,
+      "hasUrl": false,
+      "hasCipher": false
+    },
+    {
+      "itag": 251,
+      "mimeType": "audio/webm; codecs=\"opus\"",
+      "quality": "tiny",
+      "bitrate": 11200,
+      "hasUrl": false,
+      "hasCipher": false
+    }
+  ]
+}

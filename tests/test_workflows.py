@@ -15,19 +15,17 @@ STAGES = (
     "planning",
     "fixture_validation",
     "build",
+    "build_validation",
 )
 
 
-def test_single_workflow_contract_has_five_stages_and_internal_build_verifier() -> None:
+def test_single_workflow_contract_parses_and_has_all_six_roles() -> None:
     assert CONTRACT.is_file()
     assert not list(Path("agent/workflows/stages").glob("*.yaml"))
     bundle = load_workflow_bundle(CONTRACT)
     assert tuple(bundle["role_workflows"]) == STAGES
     assert len(bundle["host_workflows"]) == 22
     assert all(stage in bundle["role_workflows"] for stage in STAGES)
-    verification = bundle["role_workflows"]["build"]["workflow"]["independent_verification"]
-    assert verification["stage"] == "build"
-    assert verification["workflow"]["role_id"] == "build_verifier"
     for stage in STAGES:
         role = load_stage_workflow(CONTRACT, stage)["workflow"]
         assert role["input_schema"]["additionalProperties"] is False
@@ -62,7 +60,6 @@ def _bad_contract(tmp_path: Path, edit) -> Path:
         lambda d: d["role_workflows"]["build"]["workflow"]["request_result_exchange"].update(
             build_admission_precedes_execution=False
         ),
-        lambda d: d["role_workflows"]["build"]["workflow"].pop("independent_verification"),
         lambda d: d["host_workflows"].pop("structural_gap_analysis"),
         lambda d: d["host_workflows"]["structural_gap_analysis"]["input_contracts"].remove("candidate_specification"),
         lambda d: d["host_workflows"]["structural_gap_analysis"]["required_work"].remove("run_walking_skeleton"),

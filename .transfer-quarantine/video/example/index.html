@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OneShot — Interactive Demo (SIMULATED)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== Demo playback chrome (not part of the OneShot product UI) ===== -->
+<div class="demo-bar" data-testid="demo-bar">
+  <span class="demo-title">OneShot · Interactive Demo</span>
+  <span class="sim-badge" title="All workflow events in this demo are simulated fixtures. No real backend is called.">SIMULATED</span>
+  <label class="demo-field">Scenario
+    <select id="scenarioSelect" aria-label="Scenario selector"></select>
+  </label>
+  <div class="demo-controls">
+    <button id="btnPlay" type="button">▶ Play Scenario</button>
+    <button id="btnPlayAll" type="button">⏵⏵ Play All</button>
+    <button id="btnPrev" type="button">◀ Previous</button>
+    <button id="btnNext" type="button">Next Action ▶</button>
+    <button id="btnPause" type="button">⏸ Pause</button>
+    <button id="btnReset" type="button">↺ Reset</button>
+  </div>
+  <span id="stepLabel" class="step-label" data-testid="step-label">Ready</span>
+</div>
+
+<!-- ===== OneShot product UI (reproduces web/src/main.jsx + live.html) ===== -->
+<div class="app">
+  <aside class="rail" aria-label="Primary navigation">
+    <div class="brand"><span class="brand-orbit"></span></div>
+    <nav class="rail-nav">
+      <button class="rail-button active" type="button" aria-label="System chat"><span class="rail-ic">✦</span><span>Chat</span></button>
+      <button class="rail-button" type="button" aria-label="Task summary" id="navTask"><span class="rail-ic">▣</span><span>Task</span></button>
+      <button class="rail-button" type="button" aria-label="Artifacts" id="navFiles"><span class="rail-ic">▤</span><span>Files</span></button>
+    </nav>
+    <button class="rail-button rail-settings" type="button" aria-label="Open connection settings" id="navSettings"><span class="rail-ic">⚙</span><span>Connect</span></button>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="top-task">
+        <strong id="topTaskTitle">No task loaded</strong>
+        <small id="topTaskId">Create a task from System Chat</small>
+      </div>
+      <div class="top-right">
+        <span class="conn" id="healthPill"><i></i><span>Host connected</span></span>
+        <span class="conn warn" id="mcpPill"><i></i><span>MCP disconnected</span></span>
+        <span class="conn warn" id="modelPill"><i></i><span>Model disconnected</span></span>
+        <button class="icon-button" type="button" id="btnRefresh" aria-label="Refresh task">↻</button>
+        <button class="icon-button" type="button" id="btnSettings" aria-label="Open connection settings">⚙</button>
+      </div>
+    </header>
+
+    <section class="main-grid">
+      <div class="chat-panel panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">SYSTEM CHAT</div>
+            <h1>One workflow, live transcript</h1>
+          </div>
+          <div class="panel-status"><span id="eventCount">0 events</span><span id="artifactCount">0 artifacts</span></div>
+        </div>
+
+        <div class="stage-bar" id="stageBar" aria-label="Workflow stages"></div>
+
+        <div class="transcript" id="transcript" aria-label="Live chat transcript" role="log" aria-live="polite"></div>
+
+        <div class="composer-area">
+          <div class="alert" id="alertBox" role="alert" hidden>
+            <span>⚠</span><span id="alertText"></span>
+            <button type="button" id="alertClose" aria-label="Dismiss error">✕</button>
+          </div>
+          <form class="composer" id="composerForm">
+            <textarea id="promptInput" aria-label="Task request" placeholder="Message OneShot… create a live host-backed task" rows="2"></textarea>
+            <div class="composer-row">
+              <label class="purpose-picker"><span>Capability</span>
+                <select id="purposeSelect" aria-label="Task capability">
+                  <option value="research">Research</option>
+                  <option value="audit">Audit</option>
+                </select>
+              </label>
+              <div class="composer-hint">Enter to send · Shift+Enter for new line</div>
+              <button class="send-button" type="submit" id="sendBtn" aria-label="Submit task" disabled>↑</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <aside class="summary-panel panel" id="summary">
+        <div class="summary-block">
+          <div class="eyebrow">TASK SUMMARY</div>
+          <h2 id="summaryTitle">No task loaded</h2>
+          <p id="nextAction">Submit a request in System Chat to create a host-backed task.</p>
+        </div>
+        <div class="summary-stat"><span>Task ID</span><strong id="statTaskId">—</strong></div>
+        <div class="summary-stat"><span>Current stage</span><strong id="statStage">—</strong></div>
+        <div class="summary-stat"><span>Execution</span><strong id="statExecution">idle</strong></div>
+        <div class="summary-stat"><span>Capability</span><strong id="statCapability">Research</strong></div>
+
+        <div class="progress-wrap" id="progressWrap" hidden>
+          <div class="progress-head"><span id="progressLabel">Build progress</span><strong id="progressPct">0%</strong></div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+
+        <div class="summary-actions">
+          <button class="primary-button" type="button" id="runBtn" disabled>Create a task first</button>
+          <div class="action-help" id="runHelp">No task to execute yet.</div>
+        </div>
+
+
+        <div class="artifact-block" id="todoBlock" hidden>
+          <div class="artifact-head"><div class="eyebrow">PLAN TODOs</div><span id="todoCount">0 items</span></div>
+          <div class="todo-list" id="todoList"></div>
+        </div>
+
+        <div class="artifact-block" id="artifactPanel">
+          <div class="artifact-head"><div class="eyebrow">ARTIFACTS</div><span id="artifactCount2">0 files</span></div>
+          <div class="artifact-list" id="artifactList">
+            <div class="empty-note">Artifact snapshots appear here after the host persists them.</div>
+          </div>
+        </div>
+
+        <div class="artifact-block">
+          <div class="artifact-head"><div class="eyebrow">EVIDENCE STREAM</div><span id="eventCount2">0 events</span></div>
+          <div class="event-list" id="eventList">
+            <div class="empty-note">Live host events will appear here.</div>
+          </div>
+        </div>
+
+        <div class="artifact-block hint-block">
+          <div class="eyebrow">LIVE STATUS</div>
+          <p id="liveStatus">Auto-scroll is following the live transcript.</p>
+        </div>
+      </aside>
+    </section>
+  </div>
+</div>
+
+<!-- Artifact review modal (mirrors Review artifact dialog in main.jsx) -->
+<div class="modal-backdrop" id="artifactModal" hidden>
+  <div class="review-modal" role="dialog" aria-modal="true" aria-label="Review artifact">
+    <header><span>▤ <strong id="modalFileName">artifact.json</strong> <small id="modalFileRev">rev 1</small></span>
+      <button class="icon-button" id="modalClose" aria-label="Close artifact">✕</button></header>
+    <div class="modal-meta" id="modalMeta">Read-only artifact</div>
+    <label for="file-editor">Artifact content</label>
+    <textarea id="file-editor" spellcheck="false" readonly></textarea>
+    <footer><span>This artifact cannot be edited.</span>
+      <button class="secondary-button" id="modalClose2" type="button">Close</button></footer>
+  </div>
+</div>
+
+<!-- Connection settings modal (mirrors the connector modal in web/src/main.jsx) -->
+<div class="modal-backdrop" id="settingsModal" hidden>
+  <div class="review-modal connector-modal" role="dialog" aria-modal="true" aria-label="Connection settings">
+    <header><span>⚙ <strong>Connection settings</strong> <small>SIMULATED</small></span>
+      <button class="icon-button" id="settingsClose" aria-label="Close connection settings">✕</button></header>
+    <div class="connector-grid">
+      <section class="connector-section" aria-label="MCP connection">
+        <div class="eyebrow">MCP CONNECTION</div>
+        <label for="mcpUrl">MCP server URL</label>
+        <input id="mcpUrl" class="settings-input" type="url" placeholder="http://127.0.0.1:9234/mcp" autocomplete="off">
+        <label for="mcpAuthType">Authentication type</label>
+        <select id="mcpAuthType" class="settings-input">
+          <option value="none">None</option>
+          <option value="bearer">Bearer token</option>
+        </select>
+        <label for="mcpToken" id="mcpTokenLabel" hidden>Bearer token</label>
+        <input id="mcpToken" class="settings-input" type="password" placeholder="Secret token" autocomplete="off" hidden>
+        <div class="connector-status">
+          <span class="status-chip muted" id="mcpStateChip"><span class="dot"></span><span id="mcpStatus">disconnected</span></span>
+          <p class="connector-error" id="mcpError" hidden></p>
+          <p class="connector-meta">Supported transport: http</p>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" id="btnTestMcp">Test Connection</button>
+          <button class="primary-button" type="button" id="btnConnectMcp">Connect</button>
+          <button class="secondary-button" type="button" id="btnDisconnectMcp">Disconnect</button>
+        </div>
+        <div class="tool-list">
+          <div class="tool-head">Discovered tools</div>
+          <div id="mcpTools"><div class="empty-note">No tools discovered yet.</div></div>
+        </div>
+      </section>
+      <section class="connector-section" aria-label="Model API configuration">
+        <div class="eyebrow">MODEL API CONFIGURATION</div>
+        <label for="modelBaseUrl">API base URL</label>
+        <input id="modelBaseUrl" class="settings-input" type="url" placeholder="https://api.openai.com/v1" autocomplete="off">
+        <label for="modelId">Model ID</label>
+        <input id="modelId" class="settings-input" type="text" placeholder="gpt-4.1-mini" autocomplete="off">
+        <label for="modelKey">Secret API key</label>
+        <input id="modelKey" class="settings-input" type="password" placeholder="Paste key — cleared after save" autocomplete="off">
+        <div class="connector-status">
+          <span class="status-chip muted" id="modelStateChip"><span class="dot"></span><span id="modelStatus">disconnected</span></span>
+          <p class="connector-error" id="modelError" hidden></p>
+          <p class="connector-meta" id="modelResponse" hidden></p>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" id="btnTestModel">Test Connection</button>
+          <button class="primary-button" type="button" id="btnSaveModel">Save</button>
+        </div>
+        <div class="tool-list">
+          <div class="tool-head">Saved values</div>
+          <div class="tool-item"><strong id="savedModelId">No model selected</strong><span id="savedModelUrl">No base URL configured</span></div>
+        </div>
+      </section>
+    </div>
+    <footer><span id="connectorMessage">Changes are saved locally in this browser only for non-sensitive fields.</span>
+      <button class="secondary-button" type="button" id="btnClearSecrets">Clear secrets</button></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="demo.js"></script>
+</body>
+</html>
+

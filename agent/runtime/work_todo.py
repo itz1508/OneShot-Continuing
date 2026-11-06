@@ -109,7 +109,7 @@ class WorkTodoManager:
         was_new = self._artifacts.latest_revision(aid) == 0
         digest = self._artifacts.put_immutable(initial, aid, 1, "work_todo", "1.0")
         if was_new:
-            self._events.append(binding.task_id, "work_todo_created", aid, event_id=f"work-todo-created:{aid}")
+            self._events.append(binding.task_id, "work_todo_created", aid)
         revision = self._artifacts.latest_revision(aid)
         ref = self._ref(aid, revision, self._artifacts.get_digest(aid, revision) or digest, "work_todo")
         return self.read(ref), ref
@@ -173,12 +173,7 @@ class WorkTodoManager:
         )
         revision, digest = self._artifacts.put_cas(updated, ref.artifact_id, ref.artifact_revision, "work_todo", "1.0")
         new_ref = self._ref(ref.artifact_id, revision, digest, "work_todo")
-        self._events.append(
-            record.task_id,
-            "work_todo_updated",
-            f"{action_id}:{status.value}:rev{revision}",
-            event_id=f"work-todo-updated:{ref.artifact_id}:{revision}",
-        )
+        self._events.append(record.task_id, "work_todo_updated", f"{action_id}:{status.value}:rev{revision}")
         return updated, new_ref
 
     def require_complete(self, ref: ArtifactRef, *, task_id: str, run_id: str, stage: str) -> TodoList:

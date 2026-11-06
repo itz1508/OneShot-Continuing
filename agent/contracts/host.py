@@ -102,7 +102,7 @@ class BuildAdmissionReceipt(ContractModel):
     authorized_action_ids: tuple[str, ...] = Field(min_length=1)
     authorized_tool_ids: tuple[str, ...] = ()
     tool_registry_ref: ArtifactRef | None = None
-    recovery_readiness_ref: ArtifactRef | None = None
+    recovery_readiness_ref: str | None = None
     receipt_ref: ReceiptRef
 
 
@@ -111,14 +111,12 @@ def admission_receipt_subject(
     authorized_action_ids: tuple[str, ...],
     authorized_tool_ids: tuple[str, ...] = (),
     tool_registry_ref: ArtifactRef | None = None,
-    recovery_readiness_ref: ArtifactRef | None = None,
 ) -> str:
     """One canonical host-bound receipt subject for issue AND verification."""
     return (
         f"{lock_receipt_ref.receipt_id}:{lock_receipt_ref.receipt_digest}:"
         f"{':'.join(authorized_action_ids)}:{':'.join(authorized_tool_ids)}:"
-        f"{tool_registry_ref.artifact_digest if tool_registry_ref else 'no-tools'}:"
-        f"{recovery_readiness_ref.artifact_digest if recovery_readiness_ref else 'no-recovery-readiness'}"
+        f"{tool_registry_ref.artifact_digest if tool_registry_ref else 'no-tools'}"
     )
 
 

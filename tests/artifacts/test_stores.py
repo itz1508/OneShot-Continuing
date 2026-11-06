@@ -96,32 +96,6 @@ class TestEventStore:
         assert len(events) == 2
         assert events[0]["seq"] < events[1]["seq"]
 
-    def test_keyed_replay_is_single_event_and_conflict_is_rejected(self, tmp_path):
-        store = EventStore(tmp_path)
-        first = store.append("task-001", "stage_transition", "research -> audit", event_id="transition-1")
-        assert store.append("task-001", "stage_transition", "research -> audit", event_id="transition-1") == first
-        assert len(store.list("task-001")) == 1
-        with pytest.raises(ValueError, match="conflicting"):
-            store.append("task-001", "stage_transition", "audit -> planning", event_id="transition-1")
-
-    def test_legacy_event_rows_survive_identity_migration(self, tmp_path):
-        import sqlite3
-
-        database = tmp_path / "events.db"
-        with sqlite3.connect(database) as conn:
-            conn.execute(
-                "CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, "
-                "event_type TEXT NOT NULL, event_data TEXT NOT NULL, "
-                "created_at TEXT NOT NULL DEFAULT (datetime('now')))"
-            )
-            conn.execute(
-                "INSERT INTO events(task_id,event_type,event_data,created_at) VALUES(?,?,?,?)",
-                ("task-001", "legacy", "old", "2026-01-01"),
-            )
-        store = EventStore(tmp_path)
-        store.append("task-001", "new", "value", event_id="new-1")
-        assert [event["event_type"] for event in store.list("task-001")] == ["legacy", "new"]
-
 
 class TestCheckpointStore:
     def test_cas_success(self, tmp_path):

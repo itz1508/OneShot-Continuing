@@ -13,7 +13,7 @@ from pydantic import Field, model_validator
 
 from agent.contracts.common import ArtifactRef, ContractModel
 
-StageId = Literal["research", "audit_discovery", "planning", "fixture_validation", "build"]
+StageId = Literal["research", "audit_discovery", "planning", "fixture_validation", "build", "build_validation"]
 
 
 class WorkStatus(StrEnum):

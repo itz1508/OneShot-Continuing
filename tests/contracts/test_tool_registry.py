@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agent.contracts.common import ArtifactRef, DiagnosticStatus
+from agent.contracts.common import ArtifactRef
 from agent.contracts.planning import BuildSpecification, CreateAction
 from agent.contracts.tool_registry import (
     ParamKind,
@@ -22,7 +22,6 @@ from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.build_admission import BuildAdmission, BuildAdmissionError
 from agent.runtime.package_lock import PackageLock
 from agent.runtime.receipt_store import ReceiptStore
-from agent.runtime.recovery_readiness import RecoveryReadiness, pin_recovery_readiness
 from agent.runtime.tool_registry import (
     ToolRegistryError,
     load_pinned_tool_registry,
@@ -179,24 +178,11 @@ def test_build_admission_derives_tools_from_locked_spec(tmp_path) -> None:
         )
     lock = PackageLock(store, receipts).lock("lock-001", *upstream, tool_registry_ref=registry_ref)
     subject = ":".join(ref.artifact_digest for ref in upstream) + ":" + registry_ref.artifact_digest
-    readiness_ref = pin_recovery_readiness(
-        store,
-        RecoveryReadiness(
-            task_id="task-001",
-            run_id="run-001",
-            checkpoint_ref=upstream[0],
-            operation_ledger_ref=upstream[1],
-            reconciliation_check_ref=upstream[2],
-            diagnostic_status=DiagnosticStatus.VALID,
-        ),
-        "synthetic-recovery-readiness",
-    )
     admission = BuildAdmission(receipts, store).admit(
         "adm-001",
         lock.receipt_ref,
         ("act-001",),
         subject,
-        recovery_readiness_ref=readiness_ref,
         build_spec=spec(invocation()),
         package_lock=lock,
     )

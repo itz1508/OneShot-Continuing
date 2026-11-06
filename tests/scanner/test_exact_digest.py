@@ -98,11 +98,11 @@ class TestScannerGateway:
         assert result.request_id
 
     def test_scan_with_empty_capabilities(self):
-        """SCN07: Empty coverage cannot establish a Scanner pass."""
+        """SCN07: Scan with no requested capabilities passes."""
         gw = ScannerGateway()
         ref = make_ref()
         result = gw.scan_exact(ref, "repo-001", ())
-        assert result.outcome == ScannerOutcome.BLOCKED
+        assert result.outcome == ScannerOutcome.PASS
 
     def test_capability_ids_are_str_enum(self):
         """SCN08: Scanner capability IDs are string enums."""

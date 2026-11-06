@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["mode", "query", "documents", "exact_duplicates", "line_overlaps", "excerpts", "output_bytes", "limitations"],
+  "properties": {
+    "mode": {"const": "extractive"},
+    "query": {"type": "string"},
+    "documents": {"type": "array", "minItems": 1, "maxItems": 32, "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "name", "sha256", "size", "coverage"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "size": {"type": "integer", "minimum": 0},
+        "coverage": {"enum": ["complete", "partial", "metadata_only", "unsupported_encoding", "binary_unsupported"]},
+        "selected_bytes": {"type": "integer", "minimum": 0},
+        "imports": {"type": "array", "items": {"type": "string"}},
+        "dependency_error": {"type": "string"},
+        "analysis_limited": {"type": "boolean"},
+        "archive": {"type": "object", "additionalProperties": false,
+          "required": ["entries", "expanded_bytes", "content_inspected"],
+          "properties": {
+            "entries": {"type": "array", "items": {
+              "type": "object", "additionalProperties": false, "required": ["name", "size"],
+              "properties": {"name": {"type": "string"}, "size": {"type": "integer", "minimum": 0}}
+            }},
+            "expanded_bytes": {"type": "integer", "minimum": 0},
+            "content_inspected": {"const": false}
+          }
+        }
+      }
+    }},
+    "exact_duplicates": {"type": "array", "items": {"type": "array", "minItems": 2, "items": {"type": "string"}}},
+    "line_overlaps": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["left", "right", "shared_lines", "jaccard"],
+      "properties": {
+        "left": {"type": "string"}, "right": {"type": "string"},
+        "shared_lines": {"type": "integer", "minimum": 1},
+        "jaccard": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }},
+    "baseline_comparisons": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseline_id", "target_id", "baseline_sha256", "target_sha256", "byte_relation", "comparison_coverage", "added_distinct_lines", "removed_distinct_lines"],
+      "properties": {
+        "baseline_id": {"type": "string"}, "target_id": {"type": "string"},
+        "baseline_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "target_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "byte_relation": {"enum": ["identical", "different"]},
+        "comparison_coverage": {"enum": ["complete", "partial", "unsupported"]},
+        "added_distinct_lines": {"type": ["integer", "null"], "minimum": 0},
+        "removed_distinct_lines": {"type": ["integer", "null"], "minimum": 0}
+      }
+    }},
+    "excerpts": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "sha256", "line", "start_byte", "end_byte", "content"],
+      "properties": {
+        "source_id": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "line": {"type": "integer", "minimum": 1},
+        "start_byte": {"type": "integer", "minimum": 0},
+        "end_byte": {"type": "integer", "minimum": 0},
+        "content": {"type": "string"}
+      }
+    }},
+    "output_bytes": {"type": "integer", "minimum": 0, "maximum": 262144},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "thread_id", "owner", "objective", "summary", "checkpoint", "revision", "budget", "lifecycle", "created_at", "updated_at"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "owner": {"type": "string", "minLength": 1},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 10000},
+    "summary": {"type": "string", "maxLength": 20000},
+    "checkpoint": {"type": "string", "maxLength": 2000},
+    "revision": {"type": "integer", "minimum": 0},
+    "budget": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "lifecycle": {"enum": ["open", "completed"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

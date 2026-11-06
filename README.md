@@ -1,12 +1,12 @@
-# OneShot-Continuing
+# OneShot
 
 **Evidence-driven software engineering, from user request to independently verified implementation.**
 
-OneShot-Continuing organizes Discovery, Research, Repository Audit, Planning, and Build through traceable evidence, exact user approval, isolated execution, and independent verification.
+OneShot organizes Discovery, Research, Repository Audit, Planning, and Build through traceable evidence, exact user approval, isolated execution, and independent verification.
 
-[![CI](https://github.com/itz1508/OneShot-Continuing/actions/workflows/ci.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/ci.yml)
-[![MVP integration](https://github.com/itz1508/OneShot-Continuing/actions/workflows/mvp.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/mvp.yml)
-[![Research and Audit](https://github.com/itz1508/OneShot-Continuing/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/audit-capabilities.yml)
+[![CI](https://github.com/itz1508/OneShot/actions/workflows/ci.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/ci.yml)
+[![MVP integration](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/mvp.yml)
+[![Research and Audit](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot/actions/workflows/audit-capabilities.yml)
 
 ## Workflow
 
@@ -16,7 +16,7 @@ OneShot-Continuing organizes Discovery, Research, Repository Audit, Planning, an
 
 **Main sequence:** User Request → Intent Summary → Discovery → Research → Repository Audit → Planning → User Review and Approval → Builder → Preflight → Sandbox Execution → Independent Validation → Completion and Retention.
 
-Catalog and Template Selection is a supporting service supplying versioned guidance to **Discovery and Research**, not a workflow stage. Templates do not prove success. Audit can request more evidence from Research. Scanner is the **final operation inside Planning**, not an additional workflow stage. Builder, Preflight, and Sandbox Execution together form the Build phase.
+Catalog is supporting memory that supplies versioned templates to **Discovery and Research**; templates guide expectations but do not prove success. Audit can request more evidence from Research. Scanner is the **final operation inside Planning**, not an additional workflow stage. Builder, Preflight, and Sandbox Execution together form the Build phase.
 
 ## Stage responsibilities
 
@@ -85,9 +85,7 @@ Completion requires independent evidence for accepted requirements, accounted-fo
 
 ## Implementation status
 
-**Provenance:** OneShot-Continuing is an independent continuation snapshot of [OneShot](https://github.com/itz1508/OneShot). See [CONTINUATION.md](CONTINUATION.md) for the imported baseline and [the implementation audit](audit/workflow-alignment-2026-11-05.md) for completed work and remaining gaps. Workflow graphics represent intended architecture, not implemented capabilities.
-
-**Intended workflow:** The diagram and narrative above describe the target experience. **Declared workflow:** [`.agents/contracts/workflow.yaml`](.agents/contracts/workflow.yaml) currently registers Research → Audit Discovery → Planning → Fixture Validation → Build → Build Validation, plus internal structural checks, specification freeze, package lock, `build_admission` (Build Authorization), and integration operations. These implementation mechanisms are not additional user-facing stages.
+**Intended workflow:** The diagram and narrative above describe the target experience. **Declared workflow:** [`.agents/contracts/workflow.yaml`](.agents/contracts/workflow.yaml) currently registers Research → Audit Discovery → Planning → Fixture Validation → Build → Build Validation, plus internal structural checks, specification freeze, package lock, Build Admission, and integration operations. These implementation mechanisms are not additional user-facing stages.
 
 The current React/Vite and FastAPI MVP supports task input, persistence, SSE, MCP-backed Research integration, controlled input updates, and a separate read-only Audit capability. A connected Discovery-first workflow and complete Build-to-E2E execution have **not** been verified. The [standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md) has a separate integration boundary. Claims of working behavior must refer to the actual tested revision and evidence.
 
@@ -131,10 +129,10 @@ npm run build
 npm run test:browser
 ```
 
-Browser tests use deterministic MCP fixtures; they do not prove live-model operation. See [GitHub Actions](https://github.com/itz1508/OneShot-Continuing/actions) for recorded CI runs.
+Browser tests use deterministic MCP fixtures; they do not prove live-model operation. See [GitHub Actions](https://github.com/itz1508/OneShot/actions) for recorded CI runs.
 
 ## Repository guide
 
 [`AGENTS.md`](AGENTS.md) · [Workflow contract](.agents/contracts/workflow.yaml) · [`agent/contracts/`](agent/contracts/) · [`agent/runtime/`](agent/runtime/) · [`agent/audit/`](agent/audit/) · [`mvp/`](mvp/) · [`web/`](web/) · [`tests/`](tests/) · [`deployment/modal/`](deployment/modal/)
 
-**Continuing repository:** [itz1508/OneShot-Continuing](https://github.com/itz1508/OneShot-Continuing) · `main`
+**Canonical repository:** [itz1508/OneShot](https://github.com/itz1508/OneShot) · `main`

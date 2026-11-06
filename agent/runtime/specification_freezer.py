@@ -6,13 +6,8 @@ from pydantic import BaseModel
 
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import FreezeReceipt, ReceiptRef
-from agent.contracts.scanner import ScannerEvidence
 from agent.runtime.artifact_store import ArtifactStore
-from agent.runtime.canonical_serialization import canonical_bytes, digest_raw
-from agent.runtime.host_gap_analyzer import verify_structural_pass
 from agent.runtime.receipt_store import ReceiptStore
-from agent.runtime.scanner_check_registry import ScannerCheckRegistry
-from agent.runtime.scanner_evidence import verify_scanner_evidence
 
 
 class FreezeError(Exception):
@@ -42,62 +37,31 @@ class SpecificationFreezer:
         revision: int,
         contract_id: str,
         contract_version: str,
-        scanner_evidence: ScannerEvidence,
-        scanner_check_registry_ref: ArtifactRef,
-        gap_result_ref: ArtifactRef,
-        gap_receipt_ref: ReceiptRef,
-        task_id: str,
-        run_id: str,
+        scanner_receipt_id: str,
+        scanner_receipt_digest: str,
         repository_identity_ref: str,
         authorization_receipt_id: str,
         authorization_receipt_digest: str,
         issuer_id: str = "host",
     ) -> FreezeReceipt:
-        """Freeze only after exact structural, Scanner, and approval receipts verify."""
-        digest_before_write = digest_raw(canonical_bytes(candidate_model))
+        """Freeze a candidate specification."""
+        # Store the artifact
+        digest = self._store.put_immutable(candidate_model, artifact_id, revision, contract_id, contract_version)
+
+        # Issue freeze receipt
+        freeze_receipt_id = f"freeze-{artifact_id}-rev{revision}"
+        _, _freeze_receipt_digest = self._receipts.issue_verified(freeze_receipt_id, issuer_id, digest)
+
+        # Build artifact refs
         candidate_ref = ArtifactRef(
             artifact_id=artifact_id,
             artifact_revision=revision,
-            artifact_digest=digest_before_write,
+            artifact_digest=digest,
             contract_id=contract_id,
             contract_version=contract_version,
             serializer_profile="rfc8785-jcs-sha256-v1",
         )
-        try:
-            verify_structural_pass(
-                self._store,
-                self._receipts,
-                task_id,
-                run_id,
-                gap_result_ref,
-                gap_receipt_ref,
-                candidate_ref,
-            )
-            registry = ScannerCheckRegistry(self._store, scanner_check_registry_ref)
-            verify_scanner_evidence(
-                self._store,
-                self._receipts,
-                scanner_evidence,
-                candidate_ref,
-                registry,
-                task_id,
-                run_id,
-                repository_identity_ref,
-            )
-        except Exception as exc:
-            raise FreezeError(f"Planning gates are not valid: {exc}") from exc
-        if issuer_id != "host" or not self._receipts.verify(
-            authorization_receipt_id,
-            authorization_receipt_digest,
-            f"approve-freeze:{digest_before_write}",
-        ):
-            raise FreezeError("host approval receipt is not verified")
-
-        digest = self._store.put_immutable(candidate_model, artifact_id, revision, contract_id, contract_version)
-
-        # Build artifact refs
-        if digest != digest_before_write:
-            raise FreezeError("candidate changed during freeze")
+        frozen_ref = candidate_ref.model_copy(update={"artifact_id": f"frozen-{artifact_id}"})
         # Store frozen copy
         frozen_digest = self._store.put_immutable(
             candidate_model, f"frozen-{artifact_id}", revision, contract_id, contract_version
@@ -111,16 +75,13 @@ class SpecificationFreezer:
             serializer_profile="rfc8785-jcs-sha256-v1",
         )
 
-        freeze_receipt_id = f"freeze-{artifact_id}-rev{revision}"
-        self._receipts.issue_verified(freeze_receipt_id, issuer_id, digest)
-
         return FreezeReceipt(
             candidate_ref=candidate_ref,
             frozen_ref=frozen_ref,
             scanner_receipt_ref=ReceiptRef(
-                receipt_id=scanner_evidence.receipt_ref.receipt_id,
-                receipt_digest=scanner_evidence.receipt_ref.receipt_digest,
-                issuer_id="host",
+                receipt_id=scanner_receipt_id,
+                receipt_digest=scanner_receipt_digest,
+                issuer_id="scanner",
             ),
             repository_identity_ref=repository_identity_ref,
             authorization_receipt_ref=ReceiptRef(

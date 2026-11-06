@@ -1,0 +1,1 @@
+D:/OneShot/.pytest-rename-full/test_s4g_symlink_escape_blocke0/outside_target.txt

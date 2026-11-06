@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["event_id", "task_id", "thread_id", "revision", "operation", "timestamp", "details"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "operation": {"enum": ["created", "saved", "source_admitted", "evidence_recorded", "completed"]},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "details": {"type": "object"}
+  },
+  "allOf": [{
+    "if": {"properties": {"operation": {"const": "saved"}}},
+    "then": {"properties": {"details": {
+      "type": "object", "additionalProperties": false,
+      "dependentRequired": {"operation_name": ["outcome"], "outcome": ["operation_name"]},
+      "properties": {
+        "operation_name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "outcome": {"enum": ["succeeded", "failed", "interrupted", "denied"]}
+      }
+    }}}
+  }]
+}

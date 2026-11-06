@@ -7,8 +7,11 @@ from pathlib import Path
 
 from agent.contracts.host import Checkpoint
 from agent.runtime.canonical_serialization import canonical_bytes
-from agent.runtime.checkpoint_store import StaleCheckpointError as StaleCheckpointError
-from agent.runtime.checkpoint_store import require_next_revision
+from agent.runtime.checkpoint_store import CheckpointStoreError
+
+
+class StaleCheckpointError(CheckpointStoreError):
+    """Raised when a checkpoint write conflicts with an existing revision."""
 
 
 class SQLiteCheckpointStore:
@@ -39,7 +42,10 @@ class SQLiteCheckpointStore:
                 (checkpoint.checkpoint_id,),
             ).fetchone()
             current = 0 if row is None else int(row[0])
-            require_next_revision(current, checkpoint.expected_previous_revision, checkpoint.checkpoint_revision)
+            if checkpoint.expected_previous_revision != current:
+                raise StaleCheckpointError(f"Expected {checkpoint.expected_previous_revision}, found {current}")
+            if checkpoint.checkpoint_revision != current + 1:
+                raise StaleCheckpointError("Revision must increase by one")
             self.connection.execute(
                 "INSERT INTO checkpoints(checkpoint_id, revision, payload) VALUES(?, ?, ?) "
                 "ON CONFLICT(checkpoint_id) DO UPDATE SET revision=excluded.revision, "

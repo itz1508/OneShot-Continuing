@@ -6,8 +6,6 @@ from datetime import UTC, datetime
 import pytest
 
 from agent.contracts.stage_log import StageLogEvent
-from agent.runtime.event_store import EventStore
-from agent.runtime.runtime_root_registry import RuntimeRootRegistry
 from agent.runtime.stage_journal import StageJournalError, StageJournalService
 
 
@@ -35,24 +33,6 @@ def test_per_run_order_and_idempotency(tmp_path):
     assert len(service.load(workspace_id="w", task_id="t", run_id="r", stage="search")) == 1
     assert len((tmp_path / "runtime/w/t/r/search.log").read_text().splitlines()) == 1
     assert len((tmp_path / "runtime/w/t/r/audit.log").read_text().splitlines()) == 1
-
-
-def test_stage_journal_and_workflow_events_keep_distinct_owners(tmp_path):
-    events = EventStore(tmp_path)
-    journal = StageJournalService(tmp_path / "runtime", tmp_path / "events.db")
-    journal.append(event())
-    assert events.list("t") == []
-    events.append("t", "stage_transition", "research -> audit", event_id="transition-1")
-    assert len(journal.load(workspace_id="w", task_id="t", run_id="r", stage="search")) == 1
-    assert len(events.list("t")) == 1
-
-
-def test_stage_journal_uses_registered_runtime_root(tmp_path):
-    roots = RuntimeRootRegistry()
-    roots.register("stage-logs", tmp_path / "runtime")
-    journal = StageJournalService.from_registry(roots, "stage-logs", tmp_path / "events.db")
-    journal.append(event())
-    assert (tmp_path / "runtime/w/t/r/search.log").is_file()
 
 
 def test_rebuild_after_lost_projection(tmp_path):

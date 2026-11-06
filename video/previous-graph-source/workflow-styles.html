@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OneShot · animated node traces</title>
+  <style>html,body{width:1240px;height:1754px;margin:0;overflow:hidden}svg{display:block;width:1240px;height:1754px}</style>
+</head>
+<body><svg id="art" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1754"></svg>
+<script>
+const query=new URLSearchParams(location.search);
+const style=Math.max(1,Math.min(10,Number(query.get('style'))||1));
+const frame=Math.max(0,Math.min(59,Number(query.get('phase'))||0));
+const progress=(frame+.5)/60;
+const active=Math.min(4,Math.floor(progress*5));
+const stageNames=['Research','Audit discovery','Planning','Fixture validation','Build'];
+const stageNotes=['Evidence and criteria','Source and behavior','Specification and checks','Frozen fixture observations','Implement, check, independent E2E'];
+const resources=['Catalog','Repository','Scanner via Host','Fixture checks','Sandbox'];
+const titles=['Obsidian graph','Signal lanes','Blueprint topology','Aurora flow','Editorial graph','Trace console','Organic network','Metro signal','Systems atlas','Holographic graph'];
+const configurations=[
+  {name:titles[0],dark:true,bg:'#11121d',panel:'#202135',ink:'#f2f1ff',muted:'#aaa9c5',accent:'#a994ff',accent2:'#72d7df',shape:'orb',route:'curve',font:'Segoe UI Variable,Segoe UI,sans-serif',host:[620,850],nodes:[[620,420],[960,680],[850,1280],[390,1280],[250,680]]},
+  {name:titles[1],dark:true,bg:'#0a171b',panel:'#10292c',ink:'#eafff8',muted:'#9bb8b8',accent:'#63e6c3',accent2:'#edc17e',shape:'card',route:'curve',font:'Bahnschrift,Segoe UI,sans-serif',host:[570,320],nodes:[[300,500],[890,660],[300,830],[890,1090],[520,1400]]},
+  {name:titles[2],dark:true,bg:'#0c2b4d',panel:'#123b60',ink:'#effaff',muted:'#add4e7',accent:'#75ddf3',accent2:'#f6c56e',shape:'blueprint',route:'orth',font:'Cascadia Code,Consolas,monospace',host:[930,320],nodes:[[265,470],[800,640],[270,820],[800,1090],[455,1390]]},
+  {name:titles[3],dark:true,bg:'#101a38',panel:'#192b4e',ink:'#f7faff',muted:'#bac9e5',accent:'#82e8dc',accent2:'#c5a4ff',shape:'glass',route:'curve',font:'Aptos Display,Segoe UI,sans-serif',host:[630,315],nodes:[[325,500],[870,650],[355,840],[845,1085],[525,1400]]},
+  {name:titles[4],dark:false,bg:'#f6f5ef',panel:'#fffefd',ink:'#1d282b',muted:'#687478',accent:'#df634f',accent2:'#4169a7',shape:'editorial',route:'straight',font:'Georgia,serif',host:[190,330],nodes:[[325,495],[860,660],[325,845],[860,1090],[525,1395]]},
+  {name:titles[5],dark:true,bg:'#070d0c',panel:'#0f1d19',ink:'#e8f7e9',muted:'#91b09b',accent:'#9af27e',accent2:'#e8bd67',shape:'terminal',route:'orth',font:'Cascadia Code,Consolas,monospace',host:[920,345],nodes:[[305,460],[305,705],[305,950],[305,1195],[305,1440]]},
+  {name:titles[6],dark:true,bg:'#10231d',panel:'#1c372c',ink:'#f4fff5',muted:'#b2d0bb',accent:'#b5ed9b',accent2:'#e6ce8c',shape:'leaf',route:'curve',font:'Georgia,serif',host:[620,305],nodes:[[310,480],[850,650],[340,850],[860,1080],[515,1380]]},
+  {name:titles[7],dark:true,bg:'#182351',panel:'#263469',ink:'#fff9f0',muted:'#bec9eb',accent:'#ffd269',accent2:'#f48bbf',shape:'station',route:'curve',font:'Bahnschrift,Segoe UI,sans-serif',host:[620,315],nodes:[[300,510],[900,650],[295,855],[900,1100],[520,1390]]},
+  {name:titles[8],dark:false,bg:'#f4f4ee',panel:'#ffffff',ink:'#191e20',muted:'#606a6e',accent:'#d85735',accent2:'#376e81',shape:'atlas',route:'orth',font:'Bahnschrift,Segoe UI,sans-serif',host:[185,330],nodes:[[345,500],[875,670],[350,865],[865,1090],[525,1390]]},
+  {name:titles[9],dark:true,bg:'#0e102c',panel:'#1d2351',ink:'#f5f3ff',muted:'#b4b5d7',accent:'#8fcaff',accent2:'#e1a0ff',shape:'hex',route:'curve',font:'Segoe UI Variable,Segoe UI,sans-serif',host:[620,840],nodes:[[620,420],[965,680],[840,1270],[390,1270],[250,680]]},
+];
+const cfg=configurations[style-1];
+const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const R=(x,y,w,h,fill,stroke='none',rx=0,sw=1,extra='')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${extra}/>`;
+const C=(x,y,r,fill,stroke='none',sw=1,extra='')=>`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${extra}/>`;
+const L=(x1,y1,x2,y2,color,sw=2,extra='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" ${extra}/>`;
+const P=(d,color,sw=2,extra='')=>`<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" ${extra}/>`;
+const T=(x,y,s,size,color,weight=500,anchor='start',font=cfg.font,extra='')=>`<text x="${x}" y="${y}" fill="${color}" font-family="${font}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" ${extra}>${esc(s)}</text>`;
+const S=(text)=>`<span>${esc(text)}</span>`;
+const defs=`<defs>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="${cfg.accent}" stroke-width="1" opacity=".11"/></pattern>
+  <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.4" fill="${cfg.accent}" opacity=".22"/></pattern>
+  <radialGradient id="field"><stop stop-color="${cfg.panel}"/><stop offset="1" stop-color="${cfg.bg}"/></radialGradient>
+  <linearGradient id="trace"><stop stop-color="${cfg.accent2}"/><stop offset="1" stop-color="${cfg.accent}"/></linearGradient>
+  <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="13"/></filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10Z" fill="${cfg.accent}"/></marker>
+  </defs>`;
+
+function background(){
+  let s=R(0,0,1240,1754,cfg.bg);
+  if(style===1){s+=R(0,0,1240,1754,'url(#field)');for(let i=0;i<90;i++){const x=48+(i*271)%1140,y=260+(i*179)%1250;s+=C(x,y,(i%3)+1,cfg.accent,'none',1,'opacity=".25"')}}
+  if(style===2){s+=R(0,0,1240,1754,'url(#dots)');for(let i=0;i<8;i++)s+=L(0,285+i*175,1240,285+i*175,cfg.accent,1,'opacity=".09"')}
+  if(style===3){s+=R(0,0,1240,1754,'url(#grid)')+R(35,36,1170,1682,'none',cfg.accent,0,1.5)}
+  if(style===4){s+=R(0,0,1240,1754,'url(#field)')+C(220,560,300,cfg.accent2,'none',1,'opacity=".08" filter="url(#glow)"')+C(1050,1230,360,cfg.accent,'none',1,'opacity=".08" filter="url(#glow)"')}
+  if(style===5){for(let y=255;y<1660;y+=148)s+=L(68,y,1172,y,'#d6ddd6',1)}
+  if(style===6){s+=R(0,0,1240,1754,'url(#grid)')+R(36,37,1168,1680,'none','#3c6951',10,1.5)}
+  if(style===7){s+=R(0,0,1240,1754,'url(#dots)')+P('M100 1560C250 1340 200 950 440 750S820 340 1100 390',cfg.accent,2,'opacity=".13"')}
+  if(style===8){s+=R(0,0,1240,1754,'url(#grid)')+C(1040,180,230,cfg.accent2,'none',1,'opacity=".07" filter="url(#glow)"')}
+  if(style===9){s+=R(0,0,1240,1754,'url(#dots)')+R(0,0,18,1754,cfg.accent)+L(74,236,1167,236,cfg.ink,3)}
+  if(style===10){s+=R(0,0,1240,1754,'url(#field)');for(let i=0;i<80;i++){const x=54+(i*359)%1130,y=270+(i*277)%1320;s+=C(x,y,(i%4)+1,cfg.accent2,'none',1,'opacity=".3"')}}
+  return s;
+}
+function header(){
+  const label=style===1?'GRAPH VIEW / LOCAL WORKFLOW':style===6?'TRACE://ONESHOT/WORKFLOW':'ONESHOT / NODE TRACE';
+  let s=T(72,90,label,18,cfg.accent,800)+T(72,161,cfg.name,style===5?60:54,cfg.ink,style===5?500:750);
+  s+=T(1167,90,`${String(style).padStart(2,'0')} / 10`,20,cfg.accent2,800,'end');
+  s+=T(72,207,'Five stages  ·  Host authority  ·  verification inside Build',19,cfg.muted,500);
+  s+=R(72,229,1095,6,cfg.dark?'#344054':'#d4d9d6','none',3)+R(72,229,1095*(frame+1)/60,6,cfg.accent,'none',3);
+  return s;
+}
+function anchor(a,b,r){
+  const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1;
+  return [a[0]+dx/len*r,a[1]+dy/len*r];
+}
+function edge(a,b,index){
+  const circular=['orb','hex','station'].includes(cfg.shape);
+  const ra=circular?112:85,rb=circular?112:85;
+  const p=anchor(a,b,ra),q=anchor(b,a,rb);
+  let d;
+  if(cfg.route==='orth'){
+    const mid=(p[1]+q[1])/2;
+    d=`M${p[0]} ${p[1]}V${mid}H${q[0]}V${q[1]}`;
+  }else if(cfg.route==='straight'){
+    d=`M${p[0]} ${p[1]}L${q[0]} ${q[1]}`;
+  }else{
+    const offset=style===7?140:style===4?100:65;
+    d=`M${p[0]} ${p[1]}C${p[0]} ${p[1]+offset},${q[0]} ${q[1]-offset},${q[0]} ${q[1]}`;
+  }
+  const reached=index<active,now=index===active;
+  const color=reached||now?cfg.accent:cfg.dark?'#526174':'#9aa6a7';
+  return P(d,color,now?5:3,`opacity="${reached||now?'.94':'.56'}" stroke-linecap="round" marker-end="url(#arrow)" data-main="${index}"`);
+}
+function hostSpokes(){
+  let s='';
+  for(let i=0;i<5;i++){
+    const a=cfg.host,b=cfg.nodes[i];
+    if(i===0)continue;
+    const p=anchor(a,b,style===1||style===10?132:80),q=anchor(b,a,style===1||style===10?110:82);
+    s+=L(p[0],p[1],q[0],q[1],cfg.accent2,1.4,'opacity=".19" stroke-dasharray="5 10"');
+  }
+  return s;
+}
+function host(){
+  const [x,y]=cfg.host;
+  if(style===1||style===10){
+    let s=C(x,y,145,cfg.accent,'none',1,'opacity=".10" filter="url(#glow)"')+C(x,y,127,cfg.panel,cfg.accent2,2.5);
+    if(style===10)s+=C(x,y,143,'none',cfg.accent,1.5,'stroke-dasharray="11 9"');
+    s+=T(x,y-38,'HOST',33,cfg.ink,850,'middle')+T(x,y,style===1?'CONTROL PLANE':'CONTROL CORE',18,cfg.accent,800,'middle');
+    s+=T(x,y+35,'route · authorize · receipt',16,cfg.muted,500,'middle');
+    s+=T(x,y+65,'reconcile · recover',15,cfg.muted,500,'middle');
+    return s;
+  }
+  const w=style===6?380:style===9?262:340,h=style===6?145:style===9?118:132;
+  const fill=style===5||style===9?cfg.ink:cfg.panel;
+  let s=R(x-w/2,y-h/2,w,h,fill,cfg.accent,style===4?26:style===7?50:12,2.5);
+  const ink=style===5||style===9?cfg.bg:cfg.ink;
+  s+=T(x,y-14,'HOST CONTROLLER',style===9?21:23,ink,850,'middle');
+  s+=T(x,y+21,'route · authorize · receipt',16,style===5||style===9?'#e8dcca':cfg.muted,550,'middle');
+  if(style===6)s+=T(x,y+50,'checkpoint + recovery',14,cfg.accent,650,'middle');
+  return s;
+}
+function stageNode(i){
+  const [x,y]=cfg.nodes[i],hot=i===active,old=i<active;
+  const border=hot?cfg.accent:cfg.dark?'#536381':'#abb4af';
+  const textColor=cfg.ink;
+  let s='';
+  if(hot)s+=C(x,y,155,cfg.accent,'none',1,'opacity=".12" filter="url(#glow)"');
+  if(cfg.shape==='orb'||cfg.shape==='station'){
+    const radius=cfg.shape==='station'?111:108;
+    s+=C(x,y,radius,cfg.panel,border,hot?4:2);
+    if(cfg.shape==='station')s+=C(x,y,radius+14,'none',cfg.accent2,2,'opacity=".6" stroke-dasharray="8 13"');
+    s+=T(x,y-47,`0${i+1}`,21,cfg.accent,850,'middle');
+    s+=T(x,y-10,stageNames[i],i===3?19:23,textColor,750,'middle');
+    s+=T(x,y+24,i===4?'Implement · verify':stageNotes[i],i===4?14:15,cfg.muted,500,'middle');
+    s+=T(x,y+57,resources[i],14,cfg.accent2,700,'middle');
+  }else if(cfg.shape==='hex'){
+    const pts=[[-126,0],[-63,-106],[63,-106],[126,0],[63,106],[-63,106]].map(([a,b])=>`${x+a},${y+b}`).join(' ');
+    s+=`<polygon points="${pts}" fill="${cfg.panel}" stroke="${border}" stroke-width="${hot?4:2}"/>`;
+    s+=T(x,y-42,`0${i+1}`,20,cfg.accent,800,'middle')+T(x,y-5,stageNames[i],i===3?18:22,textColor,750,'middle');
+    s+=T(x,y+27,i===4?'Implement · E2E':stageNotes[i],14,cfg.muted,500,'middle')+T(x,y+58,resources[i],14,cfg.accent2,700,'middle');
+  }else{
+    const w=cfg.shape==='terminal'?452:cfg.shape==='blueprint'?364:cfg.shape==='editorial'?374:cfg.shape==='atlas'?376:cfg.shape==='glass'?372:cfg.shape==='leaf'?360:cfg.shape==='card'?366:356;
+    const h=cfg.shape==='terminal'?154:cfg.shape==='blueprint'?154:cfg.shape==='glass'?154:cfg.shape==='leaf'?148:cfg.shape==='atlas'?154:146;
+    const left=x-w/2,top=y-h/2;
+    const radius=cfg.shape==='glass'?28:cfg.shape==='leaf'?72:cfg.shape==='card'?17:cfg.shape==='editorial'?4:cfg.shape==='atlas'?0:10;
+    const fill=cfg.shape==='editorial'||cfg.shape==='atlas'?cfg.panel:hot?cfg.panel:cfg.panel;
+    s+=R(left,top,w,h,fill,border,radius,hot?3:1.6);
+    if(cfg.shape==='glass')s+=R(left+2,top+2,w-4,39,'#ffffff','none',radius,1,'opacity=".06"');
+    if(cfg.shape==='terminal')s+=R(left+13,top+13,7,h-26,hot?cfg.accent:'#446958','none',3);
+    if(cfg.shape==='atlas')s+=R(left,top,12,h,hot?cfg.accent:cfg.accent2);
+    if(cfg.shape==='blueprint')s+=L(left+15,top+15,left+65,top+15,cfg.accent,2)+L(left+15,top+15,left+15,top+60,cfg.accent,2);
+    if(cfg.shape==='editorial')s+=L(left,top+h+10,left+w,top+h+10,cfg.accent,hot?3:1.5);
+    const inset=cfg.shape==='terminal'?35:cfg.shape==='atlas'?31:25;
+    const font=cfg.shape==='terminal'?'Cascadia Code,Consolas,monospace':cfg.font;
+    s+=T(left+inset,top+35,`0${i+1}  /  ${resources[i]}`,15,cfg.accent,800,'start',font);
+    s+=T(left+inset,top+79,stageNames[i],i===3?25:29,textColor,750,'start',font);
+    s+=T(left+inset,top+113,stageNotes[i],i===4?15:16,cfg.muted,500,'start',font);
+    if(cfg.shape==='terminal')s+=T(left+inset,top+141,hot?'● TRACE ACTIVE':old?'✓ OBSERVED PATH':'○ ROUTE READY',13,cfg.accent,700,'start',font);
+    if(cfg.shape==='leaf')s+=C(left+w-28,y,9,cfg.accent2);
+  }
+  if(hot)s+=C(x,y,142,cfg.accent,'none',1,'opacity=".11" filter="url(#glow)"');
+  return s;
+}
+function adjunct(){
+  let s='';
+  if(style===1||style===10){
+    const satellites=[['CATALOG',310,400],['REPOSITORY',1060,470],['SCANNER',970,1010],['SANDBOX',260,1080]];
+    satellites.forEach(([label,x,y],i)=>{
+      const b=cfg.nodes[[0,1,2,4][i]];
+      s+=L(x,y,b[0],b[1],cfg.accent2,1.4,'opacity=".35" stroke-dasharray="3 7"');
+      s+=C(x,y,9,cfg.accent2)+T(x+15,y+6,label,13,cfg.muted,750);
+    });
+  }
+  if(style===2){
+    for(let i=0;i<5;i++)s+=T(82,390+i*225,`TRACE ${String(i+1).padStart(2,'0')}`,13,cfg.accent,800,'start','Cascadia Code,Consolas,monospace');
+  }
+  if(style===3){s+=T(73,1592,'PLANNING CORRECTION → RECHECK',15,cfg.accent2,750)+P('M290 930H82V710H290',cfg.accent2,1.7,'stroke-dasharray="6 8" opacity=".55"')}
+  if(style===4){s+=C(1110,520,15,cfg.accent2,'none',1,'opacity=".7"')+C(135,1120,12,cfg.accent,'none',1,'opacity=".7"')}
+  if(style===5){s+=T(76,1560,'HOST GATE  /  EXACT ACTIONS ONLY',17,cfg.accent,800)+T(76,1590,'Blocked checks return to Planning.',17,cfg.muted,500)}
+  if(style===6){
+    s+=R(694,545,475,1000,'#0b1814','#395d48',12,1.5);
+    s+=T(724,592,'TRACE LOG',19,cfg.accent,800,'start',cfg.font);
+    const entries=['01  request → evidence','02  read-only discovery','03  candidate specification','04  fixture observations','05  admitted effects','06  independent E2E','07  host receipt'];
+    entries.forEach((entry,i)=>s+=T(724,660+i*112,entry,17,i<=active?cfg.ink:cfg.muted,500,'start',cfg.font));
+    s+=T(724,1500,'ILLUSTRATED / NO BACKEND',14,cfg.accent2,800,'start',cfg.font);
+  }
+  if(style===7){s+=P('M140 1540C300 1430 320 1170 210 1000',cfg.accent2,3,'opacity=".25"')+C(1090,1330,36,'none',cfg.accent2,1,'opacity=".45"')}
+  if(style===8){s+=R(75,1545,1088,62,'#20305f',cfg.accent2,14,1.5)+T(103,1584,'HOST / AUTHORIZATION',17,cfg.accent2,800)+T(1135,1584,'Build verification stays inside Build',17,cfg.ink,600,'end')}
+  if(style===9){s+=R(76,1535,1090,75,cfg.ink)+T(102,1581,'HOST CONTROL',18,cfg.bg,800)+T(1136,1581,'authorize  /  reconcile  /  receipt',18,'#f3d2a8',700,'end')}
+  return s;
+}
+function footer(){
+  const y=1679;
+  let s=L(72,y-30,1168,y-30,cfg.dark?'#506074':'#b6c0bd',1.4);
+  s+=T(72,y,'DESIGN STUDY  /  NOT LIVE EXECUTION',15,cfg.muted,750);
+  s+=T(1167,y,`FRAME ${String(frame+1).padStart(2,'0')} / 60`,15,cfg.accent,800,'end');
+  s+=T(72,1711,'Research → Audit discovery → Planning → Fixture validation → Build',17,cfg.ink,600);
+  s+=T(1167,1711,'BASE 78162220',14,cfg.muted,700,'end');
+  return s;
+}
+let art=defs+background()+header();
+art+=hostSpokes();
+const route=[cfg.host,...cfg.nodes];
+for(let i=0;i<5;i++)art+=edge(route[i],route[i+1],i);
+art+=adjunct()+'<g id="signal"></g>'+host();
+for(let i=0;i<5;i++)art+=stageNode(i);
+art+=footer();
+const svg=document.getElementById('art');
+svg.innerHTML=art;
+const edgeIndex=Math.min(4,Math.floor(progress*5));
+const local=progress*5-edgeIndex;
+const edgePath=svg.querySelector(`path[data-main="${edgeIndex}"]`);
+const length=edgePath.getTotalLength();
+const pos=edgePath.getPointAtLength(Math.min(length,Math.max(0,local*length)));
+let signal=C(pos.x,pos.y,28,cfg.accent,'none',1,'opacity=".25" filter="url(#glow)"')+C(pos.x,pos.y,11,cfg.accent2,cfg.bg,2.5);
+for(let i=1;i<=3;i++){
+  const back=edgePath.getPointAtLength(Math.max(0,(local-i*.045)*length));
+  signal+=C(back.x,back.y,Math.max(2,7-i),cfg.accent,'none',1,`opacity="${.5-i*.11}"`);
+}
+svg.querySelector('#signal').innerHTML=signal;
+</script></body></html>

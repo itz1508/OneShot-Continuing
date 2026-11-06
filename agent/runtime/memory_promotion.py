@@ -114,7 +114,6 @@ class HostMemoryManager:
                 admission.authorized_action_ids,
                 admission.authorized_tool_ids,
                 admission.tool_registry_ref,
-                admission.recovery_readiness_ref,
             ),
         )
         if not build.action_executions or any(
@@ -127,12 +126,11 @@ class HostMemoryManager:
             not validation.criterion_results
             or not validation.e2e_results
             or any(
-                result.outcome is not CriterionResult.VALID or not result.evidence_refs
+                result.outcome is not CriterionResult.PASS or not result.evidence_refs
                 for result in validation.criterion_results
             )
             or any(
-                result.outcome is not CriterionResult.VALID or result.exit_code != 0
-                for result in validation.e2e_results
+                result.outcome is not CriterionResult.PASS or result.exit_code != 0 for result in validation.e2e_results
             )
             or any(step.status is not StepStatus.COMPLETED for step in validation.step_results)
         ):

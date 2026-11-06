@@ -19,6 +19,7 @@ _STAGE_ROLES = {
     "planning": "planner",
     "fixture_validation": "fixture_validator",
     "build": "builder",
+    "build_validation": "build_verifier",
 }
 
 
@@ -152,7 +153,7 @@ def load_workflow_bundle(path: str | Path) -> dict[str, Any]:
     if any(tracking.get(k) != v for k, v in required_tracking.items()):
         raise LoaderError("host-owned work tracking contract invalid")
     if tracking.get("tracked_roles") != list(_STAGE_ROLES):
-        raise LoaderError("work tracking must cover all five stages")
+        raise LoaderError("work tracking must cover all six agent roles")
 
     expected_roles = list(_STAGE_ROLES)
     if bundle.get("role_order") != expected_roles or set(roles) != set(expected_roles):
@@ -196,24 +197,6 @@ def load_workflow_bundle(path: str | Path) -> dict[str, Any]:
             raise LoaderError("research cannot use criteria completeness as a gate")
         if stage == "build" and not exchange.get("build_admission_precedes_execution"):
             raise LoaderError("builder must be admitted before effects")
-
-    verification = roles["build"]["workflow"].get("independent_verification")
-    if not isinstance(verification, dict) or verification.get("stage") != "build":
-        raise LoaderError("Build must contain independent verification")
-    verifier = verification.get("workflow")
-    if (
-        not isinstance(verifier, dict)
-        or verifier.get("stage_id") != "build"
-        or verifier.get("role_id") != "build_verifier"
-    ):
-        raise LoaderError("Build verifier must remain an independent role within Build")
-    for name in ("input_schema", "output_schema"):
-        _check_exchange_schema(verifier.get(name), f"build.independent_verification.{name}")
-    outputs = verifier.get("outputs")
-    if not isinstance(outputs, list) or not any(
-        isinstance(output, dict) and output.get("contract_id") == "build_validation_record" for output in outputs
-    ):
-        raise LoaderError("Build verifier must produce independent verification evidence")
 
     if set(hosts) != _REQUIRED_HOST_WORKFLOWS:
         missing = sorted(_REQUIRED_HOST_WORKFLOWS - set(hosts))

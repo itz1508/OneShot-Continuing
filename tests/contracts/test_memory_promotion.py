@@ -10,7 +10,6 @@ from agent.contracts.build_validation import (
     CriterionResult,
     E2EResult,
     ObservedCriterionResult,
-    ValidationIssueInput,
 )
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import (
@@ -120,7 +119,7 @@ def setup_case(tmp_path, *, success=True):
             ObservedCriterionResult(
                 criterion_id="AC-001",
                 observed_result="passed",
-                outcome=CriterionResult.VALID,
+                outcome=CriterionResult.PASS,
                 evidence_refs=("EVD-001",),
                 independent_observation="CI observed",
             ),
@@ -130,11 +129,7 @@ def setup_case(tmp_path, *, success=True):
                 e2e_id="e2e",
                 entrypoint="pytest",
                 exit_code=0 if success else 1,
-                outcome=CriterionResult.VALID if success else CriterionResult.NOT_VALID,
-                evidence_refs=("EVD-001",),
-                issue_input=None
-                if success
-                else ValidationIssueInput(issue_type="verifiability", reason="E2E failed", evidence_status="not_valid"),
+                outcome=CriterionResult.PASS if success else CriterionResult.FAIL,
             ),
         ),
     )

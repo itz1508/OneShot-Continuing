@@ -1,0 +1,19 @@
+{
+  "mcp": {
+    "auth_type": "none",
+    "connected_at": "",
+    "error": "",
+    "status": "connected",
+    "tools": [],
+    "transport": "http",
+    "url": "http://127.0.0.1:9222/mcp"
+  },
+  "model": {
+    "api_base_url": "",
+    "connected_at": "",
+    "error": "",
+    "model_id": "",
+    "provider_response": "",
+    "status": "disconnected"
+  }
+}

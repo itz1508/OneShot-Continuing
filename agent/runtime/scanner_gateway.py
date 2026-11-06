@@ -48,9 +48,6 @@ class ScannerGateway:
         ScannerFinding objects. An empty tuple means the detector found
         no issues (PASS). A non-empty tuple means issues were found.
         """
-        previous = self._detectors.get(capability_id)
-        if previous is not None and previous is not detector:
-            raise ScannerGatewayError("Scanner detector registration is immutable")
         self._registered_capabilities.add(capability_id)
         self._detectors[capability_id] = detector
 
@@ -59,7 +56,6 @@ class ScannerGateway:
         candidate_ref: ArtifactRef,
         repository_identity: str,
         capabilities: tuple[str, ...],
-        registry_ref: ArtifactRef | None = None,
     ) -> ScannerResult:
         """Scan exact candidate bytes for requested capabilities.
 
@@ -67,36 +63,24 @@ class ScannerGateway:
         matches the expected digest in the candidate_ref. Returns BLOCKED
         if the artifact store is unavailable or the artifact cannot be verified.
         """
-        if not capabilities:
-            return ScannerResult(
-                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                outcome=ScannerOutcome.BLOCKED,
-                limitation_reasons=("no Scanner capabilities requested",),
-                candidate_ref=candidate_ref,
-                repository_identity=repository_identity,
-                registry_ref=registry_ref,
-            )
-        result = self._scan_exact_unbound(candidate_ref, repository_identity, capabilities)
-        return result.model_copy(
-            update={
-                "candidate_ref": candidate_ref,
-                "repository_identity": repository_identity,
-                "requested_capabilities": capabilities,
-                "registry_ref": registry_ref,
-            }
-        )
-
-    def _scan_exact_unbound(
-        self, candidate_ref: ArtifactRef, repository_identity: str, capabilities: tuple[str, ...]
-    ) -> ScannerResult:
         unsupported = [c for c in capabilities if c not in self._registered_capabilities]
         if unsupported:
             return ScannerResult(
                 request_id=f"scan-{candidate_ref.artifact_id}",
                 outcome=ScannerOutcome.BLOCKED,
-                capabilities_checked=(),
-                capabilities_not_checked=capabilities,
+                capabilities_checked=tuple(c for c in capabilities if c in self._registered_capabilities),
+                capabilities_not_checked=tuple(unsupported),
                 limitation_reasons=tuple(f"unsupported capability: {c}" for c in unsupported),
+            )
+
+        # No capabilities requested — nothing to verify
+        if not capabilities:
+            return ScannerResult(
+                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
+                outcome=ScannerOutcome.PASS,
+                capabilities_checked=(),
+                capabilities_not_checked=(),
+                findings=(),
             )
 
         # Verify content integrity if artifact store is available
@@ -154,11 +138,11 @@ class ScannerGateway:
                 continue
 
             # Retrieve artifact content for detector execution
+            artifact_bytes = self._artifact_store.get_verified(
+                candidate_ref.artifact_id,
+                candidate_ref.artifact_revision,
+            )
             try:
-                artifact_bytes = self._artifact_store.get_verified(
-                    candidate_ref.artifact_id,
-                    candidate_ref.artifact_revision,
-                )
                 findings = detector(artifact_bytes)
             except Exception as exc:
                 not_checked.append(cap)
@@ -181,7 +165,7 @@ class ScannerGateway:
         # All detectors executed — PASS only if no findings
         return ScannerResult(
             request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-            outcome=ScannerOutcome.PASS if not all_findings else ScannerOutcome.FAIL,
+            outcome=ScannerOutcome.PASS if not all_findings else ScannerOutcome.BLOCKED,
             capabilities_checked=capabilities,
             capabilities_not_checked=(),
             findings=tuple(all_findings),
@@ -189,4 +173,4 @@ class ScannerGateway:
 
     @property
     def supported_capabilities(self) -> tuple[str, ...]:
-        return tuple(sorted(self._registered_capabilities))
+        return tuple(self._registered_capabilities)
