@@ -52,3 +52,12 @@
 **Scanner scope:** The eight Planning issue types are compatibility, dependency, interface, concurrency, security, recovery, buildability and verifiability. Overlap, duplication, ownership drift and missing contracts are cross-cutting structural findings, not extra top-level stages. Scanner reports findings; Planning resolves them.
 
 **Status:** Presentation and naming have documentation-level corrections only. The connected workflow is **not READY** on this evidence. CI success verifies the configured checks, not an actual full workflow run.
+
+## 2026-11-05T19:10:17-08:00 — Evidence update (append-only)
+
+**One-line finding:** Discovery PRE → MCP Research → Discovery POST is now implemented and fixture-tested on the Continuing feature branch; the complete Build workflow is still unverified.
+
+- **Source:** [draft PR #3](https://github.com/itz1508/OneShot-Continuing/pull/3); original Continuing checkpoint `13720b7495d2ef86897ad9f13046b563c0969c5f`.
+- **Changed runtime:** PRE prepares synthetic Catalog-guided questions and a verified Research request from user intent and generated message ID. Existing Host dispatch and Research execution remain authority. POST ingests Research claims without planning or action selection; Host Audit transition requires matching PRE/POST artifacts and stable observations.
+- **Current limitations:** Source observation is bounded; summary is extractive; POST is not the canonical Audit Discovery codebase assessment; scanning memory/thread history is unimplemented. Scanner remains under Planning and does not itself authorize Build.
+- **Validation:** CI Python, Host integrity, MVP backend/frontend and Research/Audit checks confirmed successful at the code revisions above. The Chromium fixture-based browser scenario is separately pending and cannot be claimed verified. This does not establish complete Build-through-independent-E2E readiness.
