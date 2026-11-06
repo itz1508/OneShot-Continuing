@@ -1,95 +1,72 @@
 # OneShot-Continuing
 
-**Evidence-driven software engineering, from user request to independently verified implementation.**
+**Active engineering repository:** [`itz1508/OneShot-Continuing`](https://github.com/itz1508/OneShot-Continuing). The imported `itz1508/OneShot` is **frozen provenance, not a modification target**.
 
-OneShot-Continuing organizes Discovery, Research, Repository Audit, Planning, and Build through traceable evidence, exact user approval, isolated execution, and independent verification.
+> **Current architecture decision — 2026-11-06.** This section supersedes the earlier README workflow description, animated diagram, audit proposal, old Library plans, and proposed standalone orchestrator. It specifies the **target**, not a claim of completed implementation. [Implementation status](#implementation-status) distinguishes shipped behavior from work still needed.
 
-[![CI](https://github.com/itz1508/OneShot-Continuing/actions/workflows/ci.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/ci.yml)
-[![MVP integration](https://github.com/itz1508/OneShot-Continuing/actions/workflows/mvp.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/mvp.yml)
-[![Research and Audit](https://github.com/itz1508/OneShot-Continuing/actions/workflows/audit-capabilities.yml/badge.svg)](https://github.com/itz1508/OneShot-Continuing/actions/workflows/audit-capabilities.yml)
+## Workflow and authority
 
-## Workflow
+The **API** accepts requests; the **Runtime / Controller remains in control across every stage**, validates each return, and alone owns transitions, approval enforcement, agent routing, artifact/receipt storage, TaskTodo scheduling, persistence, recovery, and cleanup.
 
-![OneShot intended workflow — animated stage progression, Catalog context, approval, Build, and correction routes](docs/workflow.gif)
+```text
+API
+ |
+ v
+Runtime / Controller — encloses all transitions and result handoffs
+ |
+ +-- Audit PRE (read-only local discovery, provisional requirements)
+ +-- Research request preparation (Host-bound targeted questions)
+ +-- Researcher (sourced external evidence and fixture guidance)
+ +-- Audit POST (read-only applicability, conflicts, source mapping)
+ +-- Planning (review, design/refactoring PLAN, gap resolution, Scanner)
+ +-- Build Baseline / Fixture Validation (required files, dependencies,
+ |     configuration, assets, expected checks, fault/recovery SCENARIOS)
+ +-- User Approval (exact plan revision + source checkpoint + scope)
+ +-- Memory Prelight (Host-created immutable approval-bound context)
+ +-- Build
+ |    Builder: candidate change preparation within approved TaskTodos
+ |    Runtime Preflight: check permissions, paths, preimages, tools, state
+ |    Runtime Sandbox: apply candidates and run registered checks
+ +-- Independent Validation (integration, E2E, regression, acceptance,
+ |     applicable executable chaos/recovery tests)
+ +-- Completion (source promotion ONLY after independent evidence;
+      reconciliation, cleanup, evidence retention, memory promotion)
+```
 
-**[Standalone HTML workflow](docs/workflow.html)** — open the HTML file in a browser for a scalable vector view with pause/resume controls. The GIF and HTML show the same **intended architecture**, not an observed full runtime execution.
+Every agent reports back to the Runtime. Neither an agent, a To-Do, nor a model response grants authorization or advances the stage. Catalog examples guide PRE and Research; they are **not** evidence.
 
-**Main sequence:** User Request → Intent Summary → Discovery → Research → Repository Audit → Planning → User Review and Approval → Builder → Preflight → Sandbox Execution → Independent Validation → Completion and Retention.
+## Responsibilities and nonnegotiable boundaries
 
-Catalog and Template Selection is a supporting service supplying versioned guidance to **Discovery and Research**, not a workflow stage. Templates do not prove success. Audit can request more evidence from Research. Scanner is the **final operation inside Planning**, not an additional workflow stage. Builder, Preflight, and Sandbox Execution together form the Build phase.
-
-## Stage responsibilities
-
-| Stage | Responsibility | Handoff |
-| --- | --- | --- |
-| Intent Summary | Preserve the user's request without adding scope | Input summary |
-| Discovery | Prepare research questions, required evidence, and fixture guidance | Research request |
-| Research | Gather sourced evidence, contradictions, and unknowns | Research results |
-| Repository Audit | Inspect actual source, contracts, dependencies, and tests; read-only | Findings and CodeIntent |
-| Planning | Design, specify file actions, resolve gaps, and run final Scanner review | `BuildSpecification` |
-| User Review and Approval | Review exact plan revision, starting source checkpoint, and approved actions | Bound approval |
-| Builder | Prepare tasks and implementation changes within approved scope | Build task list and candidate |
-| Preflight | Check authorization, source identity, paths, dependencies, tools, and execution readiness | Authorized attempt |
-| Sandbox Execution | Apply changes, run checks, capture observed effects, and export artifacts | Source result and execution evidence |
-| Independent Validation | Verify the resulting source and real behavior against accepted requirements | Independent verification results |
-| Completion and Retention | Reconcile attempts, clean resources, and retain trustworthy evidence | Completion record |
-
-## Planning and Scanner
-
-Planning follows **Code Review → Design and Refactoring → Implementation Plan → Gap Analysis → Gap Resolution → Scanner**.
-
-Scanner identifies structural inconsistency—including overlap, duplication, ownership conflicts, drift, and missing contracts—across the eight issue categories defined by `PlanningIssue`:
-
-| Category | Concern |
+| Owner | Contract |
 | --- | --- |
-| Compatibility | Conflicting behavior, versions, or contracts |
-| Dependency | Missing, circular, or conflicting dependencies |
-| Interface | Inconsistent APIs, schemas, or producer/consumer handoffs |
-| Concurrency | Race conditions, ordering, or conflicting operations |
-| Security | Authorization, permissions, and unsafe effects |
-| Recovery | Interruptions, retries, and uncertain side effects |
-| Buildability | Missing actions, unsupported tools, or blockers |
-| Verifiability | Missing fixtures, checks, criteria, or evidence |
+| Audit PRE | Read-only inspection of repository, filesystem, permitted prior context, and original request; distinguish accepted requirements from candidate prerequisites and unknowns. |
+| Researcher | Sourced findings, candidate approaches, fixture setup requirements, verification criteria, contradictions, and unknowns; **not** an implementation plan or executed validation. |
+| Audit POST | Map findings against a source checkpoint; preserve conflicting and irrelevant findings with reasons. No edits, architecture decisions, or final audit certification. |
+| Planning | Review code, **plan** refactoring, resolve requirement/design gaps, define exact file actions and tests; Scanner detects gaps and returns findings to Planning. Planning does not edit source. |
+| Fixture Validation | Validate the **build-and-test baseline** (required source, interfaces, dependencies, tools, assets, requirements, test setup, traceability) before approval; define chaos and recovery scenarios. Do not claim the completed program works or run future-product chaos tests before Build. |
+| User Approval | Bind a verified plan revision, original source checkpoint, scope, dependencies, paths, actions, tools, and criteria; any material change requires renewed approval. |
+| Builder | Prepare candidate changes and report them. Runtime controls task scheduling; Builder never grants permission or directly promotes final source. |
+| Runtime Preflight / Sandbox | Before each effect, verify approval, source, paths, tools, authorization, and readiness; execute in isolation with attributable results and recoverable attempts. |
+| Independent Validation | Test actual integrated behavior, acceptance, regressions, and applicable fault/recovery cases; verify against **original accepted intent** and trace each claim to evidence. |
+| Completion | Host verifies receipts and reconcilable attempts; only then promote source and approved reusable knowledge. |
 
-**Scanner reports; Planning resolves.** Material findings prevent the candidate from advancing. Document unresolved or accepted-risk items with evidence and disposition; repeat the relevant checks when a revision changes the candidate. The current Scanner gateway declares six technical capabilities, so automated coverage of all eight Planning issue categories must not be assumed.
+**No standalone `Package Lock`, `Build Admission`, or `Task Integration` stage.** An ordinary dependency lockfile (`uv.lock`, `web/package-lock.json`) is unrelated to the retired custom Package Lock **workflow concept** and must be retained. The existing Python `BuildAdmissionReceipt`, `PackageLockReceipt`, `EffectExecutor.execute_admitted()`, and corresponding workflow declarations are **legacy implementation dependencies pending tested migration**, not architectural requirements or permission to bypass a gate. Until migrated, fail closed on missing legacy receipts; preserve exact-scope authorization, tamper resistance, and effect-time checks.
 
-## Execution contract and artifacts
+**Prelight is NOT Preflight.** `memory_prelight` is the Host-frozen, hash-bound approved context immediately before Build; `memory_validation` is independently verified outcome knowledge promoted after successful verification. These are the two persistent **recallable** memory categories, not replacements for immutable artifact records, checkpoint/receipt stores, or `search.log`, `audit.log`, `plan.log`, `build.log`, and `mem.log`. Do not add a second orchestrator or standalone memory framework.
 
-User approval is bound to the **exact plan revision and starting source checkpoint**, including authorized requirements, file paths, actions, dependencies, tools, and verification criteria. Changes produced *within* those authorized boundaries do not invalidate the initial approval; changes to the plan, starting source identity, or approved scope require renewed review.
+## Execution evidence and correction
 
-Builder prepares the approved task list and candidate. Host-managed authorization and Preflight check the exact inputs before execution; unresolved prerequisites prevent Sandbox creation. Each authorized build attempt runs in a disposable Sandbox. The standalone Modal Sandbox exports:
+Research and POST are not permission to build. Scanner assesses the **plan**, not finished behavior. Fixture Validation establishes whether the baseline is adequate, not whether the future implementation works. Preflight occurs before applying source effects. A Builder correction within the approved scope returns through Runtime checks and an isolated attempt; a scope or starting-checkpoint change returns to Planning and renewed approval. No separate Task Integration stage: integration and real E2E are independently verified; source promotion follows verification, never precedes it.
 
-| Artifact | Contents |
-| --- | --- |
-| `result.json` | Structured execution results |
-| `after.tar` | Resulting source tree |
-| `evidence.zip` | Execution logs and evidence |
-| Attempt state | Execution identity, lifecycle, and recovery history |
-
-Each handoff must bind producer, consumer, originating request, schema revision, and relevant source or plan identity. Fixture guidance starts in Discovery, is refined with evidence and repository findings, and becomes concrete checks in Planning and Validation; guidance alone is not executed evidence.
-
-## Validation, correction, and completion
-
-Independent Validation examines **the resulting source and observed application behavior**, not the Builder's self-reported success. Pre-existing baseline failures must remain distinguishable from failures introduced by a candidate.
-
-| Condition | Continuation |
-| --- | --- |
-| Repository Audit requires more evidence | Research → Repository Audit |
-| User revises the plan | Planning → User Review and Approval |
-| Preflight prerequisite is unresolved | Resolve prerequisite → repeat Preflight |
-| Validation identifies a correction **within approved requirements, design, paths, actions, dependencies, and tools** | Builder → Preflight → new Sandbox attempt → Validation |
-| Validation requires a changed scope or source starting checkpoint | Planning → renewed User Review and Approval |
-| An attempt is interrupted or its effects are uncertain | Reconcile the attempt before continuing |
-
-Completion requires independent evidence for accepted requirements, accounted-for tasks and checks, recorded final source identity, reconciled attempts, cleanup of temporary Sandboxes, and retained execution and verification artifacts. Only verified reusable knowledge is eligible for promotion.
+The standalone Modal Sandbox has a separate integration boundary and can return `result.json`, `after.tar`, `evidence.zip`, and attempt state. Such artifacts become verification evidence only after actually observed and independently assessed.
 
 ## Implementation status
 
-**Provenance:** OneShot-Continuing is an independent continuation snapshot of [OneShot](https://github.com/itz1508/OneShot). See [CONTINUATION.md](CONTINUATION.md) for the imported baseline and [the implementation audit](audit/workflow-alignment-2026-11-05.md) for completed work and remaining gaps. Workflow graphics represent intended architecture, not implemented capabilities.
-
-**Intended workflow:** The diagram and narrative above describe the target experience. **Declared workflow:** [`.agents/contracts/workflow.yaml`](.agents/contracts/workflow.yaml) currently registers Research → Audit Discovery → Planning → Fixture Validation → Build → Build Validation, plus internal structural checks, specification freeze, package lock, `build_admission` (Build Authorization), and integration operations. These implementation mechanisms are not additional user-facing stages.
-
-The current React/Vite and FastAPI MVP supports task input, persistence, SSE, MCP-backed Research integration, controlled input updates, and a separate read-only Audit capability. A connected Discovery-first workflow and complete Build-to-E2E execution have **not** been verified. The [standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md) has a separate integration boundary. Claims of working behavior must refer to the actual tested revision and evidence.
+- **Existing:** `agent/runtime/controller.py`, immutable artifacts/receipts/checkpoints, registered six-stage host lifecycle, Planner/Scanner contracts, `mvp/api.py`, and standalone `deployment/modal/sandbox_v3`.
+- **Feature branch:** [draft PR #3](https://github.com/itz1508/OneShot-Continuing/pull/3) implements bounded PRE → MCP Research → POST persistence/lineage and opt-in frontend Auto Research with fixture-based tests. It does **not** prove a full live-model or Build-through-E2E run.
+- **Drift to repair:** `.agents/contracts/workflow.yaml`, `agent/runtime/package_lock.py`, `agent/runtime/build_admission.py`, `agent/contracts/host.py`, `agent/runtime/effect_executor.py`, Build records, and related tests still depend on custom lock/admission receipts. Audit the complete consumer chain, migrate enforcement to Host approval + Preflight, demonstrate equivalent denial/recovery checks, then retire obsolete code. Do **not** merely delete files or weaken validations.
+- **Not yet verified:** full repository-aware Audit POST, connected Planning/Scanner → Fixture baseline/chaos guidance → approval/Prelight → Builder/Preflight/Modal Sandbox → independent E2E → source promotion and memory retention.
+- **Historical-only visuals:** [`docs/workflow.gif`](docs/workflow.gif) and [`docs/workflow.html`](docs/workflow.html) show an older illustrative diagram, not this authoritative workflow nor runtime evidence. [Audit history](audit/workflow-alignment-2026-11-05.md) is evidence of previous revisions, not the latest architecture decision.
 
 ## Get started
 

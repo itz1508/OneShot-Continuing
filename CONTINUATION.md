@@ -62,3 +62,24 @@ placeholders).
 - **New documentation and visual work:** `52dc3a16c6b7` added the video evidence guide; later README and workflow animation work culminated in `a2c29610448a753d4ceac3da20254eca63aee30a` (`docs/workflow.gif`, `docs/workflow.html`). These are illustrations, not executed workflow stages.
 - **Observed CI:** [run 42027538233](https://github.com/itz1508/OneShot-Continuing/actions/runs/42027538233) succeeded at `a2c2961` for Python 3.11/3.12 checks. Earlier MVP and Research/Audit CI at `1280f06` succeeded. No complete connected Discovery-first Build-through-independent-E2E run was observed.
 - **Remaining work:** refer to `audit/workflow-alignment-2026-11-05.md` for implementation gaps and public-to-internal naming.
+
+## 2026-11-05T19:10:17-08:00 — Discovery PRE/POST automation in OneShot-Continuing
+
+**One-line summary:** PRE creates a source-bound Research request; POST preserves Research evidence without authorizing Build.
+
+- **Active target:** `itz1508/OneShot-Continuing`, branch `feat/discovery-sandwich-20261105`, draft [PR #3](https://github.com/itz1508/OneShot-Continuing/pull/3); based on independent Continuing main `13720b7495d2ef86897ad9f13046b563c0969c5f`. No work from this branch was pushed to or merged into the frozen OneShot repository.
+- **Implementation:** `agent/contracts/discovery_sandwich.py`, `agent/runtime/discovery_sandwich.py`, existing Host/controller and MVP Research routing; immutable PRE/request/POST artifact references, synthetic Catalog guidance, bounded read-only source inventory, exact message/revision binding, and recovery reconciliation. Existing six role stages, Planning Scanner, and Build admission remain unchanged.
+- **Frontend:** Opt-in Auto Research checkbox submits task, attaches SSE, dispatches Research, and restores the persisted result without an extra Run click. Manual Research remains supported.
+- **Verified evidence:** Python 3.11/3.12 CI, MVP backend/frontend integration, Research/Audit, and Host integrity green at `f70ad28af506b60f4a3181470d39ef42e631d668` and `8e2853582142d59a741540d2308af32b097235a3`. The connected MCP stdio fixture test asserts PRE + Research + POST lineage; no live provider inference is claimed.
+- **Browser E2E:** A Chromium Playwright job was added to `.github/workflows/mvp.yml`; its first run was pending browser dependency installation when this record was written. Do not treat it as verified until the workflow reports an observed outcome.
+- **Outstanding:** Model-generated intent summary; authenticated external thread-message integration; durable memory/thread scanners; complete source identity; code-aware Audit mapping and canonical stage handoff; connected Planner/Scanner/Fixture/Chaos/Build/independent E2E. PR remains draft and unmerged.
+
+## 2026-11-06T01:06:45-08:00 — Active architectural decision and stale-reference cleanup
+
+**One-line summary:** OneShot-Continuing now documents one Runtime-controlled workflow without standalone Package Lock/Build Admission stages; legacy code remains until a safe tested migration.
+
+- **Current decision:** [README.md](README.md#workflow-and-authority) supersedes earlier workflow diagrams, older README narratives, previous Library plans for frozen OneShot, and the speculative Python orchestrator proposal. One Runtime/Controller controls all stages, approval, Preflight, Sandbox, memory checkpoints, effects and recovery.
+- **Retained roles:** read-only Audit PRE, Host Research request preparation, Researcher, read-only Audit POST, Planning (including Scanner), Fixture Baseline/Chaos scenario readiness, exact user approval, Builder candidate preparation, runtime Preflight/Sandbox, independent integration/E2E/chaos validation, completion and trusted memory.
+- **Memory:** `memory_prelight` freezes approval-bound context before Build and `memory_validation` records independently verified outcomes. Ordinary artifacts, checkpoints and five journals remain distinct. No vector/second memory framework is specified.
+- **Legacy distinction:** Existing `PackageLockReceipt` and `BuildAdmissionReceipt` implementation is not approved architecture, but its safety controls must remain until an evidence-backed migration; ordinary Python/npm dependency lockfiles stay intact.
+- **Changes in this revision:** documentation and agent guidance only; workflow YAML, guards, Sandbox implementation and E2E code not yet migrated. PR #3 remains draft. No main-branch merge and no change to frozen `itz1508/OneShot`.

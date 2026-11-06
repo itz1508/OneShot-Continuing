@@ -82,6 +82,7 @@ const writeStoredValue = (key, value) => {
 function App() {
   const [prompt, setPrompt] = useState('')
   const [purpose, setPurpose] = useState('research')
+  const [autoResearch, setAutoResearch] = useState(false)
   const [task, setTask] = useState(null)
   const [events, setEvents] = useState([])
   const [files, setFiles] = useState([])
@@ -484,16 +485,23 @@ function App() {
     if (!prompt.trim() || loading) return
     setLoading(true)
     setError('')
+    let createdTaskId = null
     try {
       const record = await apiFetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, purpose }),
       })
+      createdTaskId = record.task_id
       window.history.replaceState(null, '', `?task=${record.task_id}`)
       setPrompt('')
       await fetchDetails(record.task_id)
+      if (purpose === 'research' && autoResearch) {
+        await apiFetch(`/api/tasks/${record.task_id}/research`, { method: 'POST' })
+        await fetchDetails(record.task_id)
+      }
     } catch (exc) {
+      if (createdTaskId) await fetchDetails(createdTaskId).catch(() => {})
       setError(exc.message)
     } finally {
       setLoading(false)
@@ -679,6 +687,18 @@ function App() {
                       <option value="audit">Audit</option>
                     </select>
                   </label>
+                  {purpose === 'research' ? (
+                    <label className="auto-research-option">
+                      <input
+                        type="checkbox"
+                        aria-label="Automatically run Research after submit"
+                        checked={autoResearch}
+                        onChange={(event) => setAutoResearch(event.target.checked)}
+                        disabled={loading}
+                      />
+                      <span>Auto Research</span>
+                    </label>
+                  ) : null}
                   <div className="composer-hint">Enter to send · Shift+Enter for new line</div>
                   <button className="send-button" type="submit" disabled={!prompt.trim() || loading} aria-label="Submit task">
                     {loading ? <LoaderCircle size={17} className="spin" /> : <ArrowUp size={17} />}

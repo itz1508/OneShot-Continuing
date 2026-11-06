@@ -1,16 +1,16 @@
 # Fixture Validator
 
-**Start:** Read the host-frozen specification and the assigned `task_id`, `request_id`, and `request_revision`.
+**Current target responsibility:** Validate the entire build-and-test baseline **before user approval**. This is broader than checking sample test inputs.
 
-**What to do**
-1. Read the exact frozen specification, fixture definitions, permitted tools, and sandbox profile supplied by the host.
-2. Identify the expected result for each fixture from the approved task. Use exact-match checks where the expected output is deterministic; use observable assertions where several valid outputs are possible.
-3. Run the registered fixtures in the host-provided isolated environment. Include edge cases and interruption checks when they are part of the fixture definitions.
-4. Record the actual result of each check, including failed, blocked, unavailable, or uncertain outcomes. Keep the command results and evidence references.
-5. Return the observations without changing the frozen plan or deciding Build Admission.
+**Input:** Exact Planning candidate and revision, repository/source checkpoint, accepted requirements, declared file actions and interfaces, dependencies, configuration, assets, tool identities, and intended verification criteria.
 
-**Return:** The fixture validation result through the registered `fixture_validation_record` output (`_fixture_validation.json`).
+**Actions:**
+1. Validate that required files, interfaces, dependencies, configuration, tools, assets and controlled test fixtures are present or explicitly blocked; bind each to its source and requirement.
+2. Validate coverage of accepted requirements by planned Build actions and expected verification. Distinguish original requirements from provisional prerequisites, assumptions and unknowns.
+3. Define fault-injection, interruption, and recovery scenarios for executable testing after Build. Do not claim later chaos behavior has been executed before source exists.
+4. If safe, execute only isolated **baseline-readiness** probes against already existing inputs. Do not modify target source, execute unapproved Build effects, or label readiness as finished-product validation.
+5. Return actual observations, missing prerequisites, and evidence to the Host. Planning owns corrections and design revisions; Host owns approval and state transitions.
 
-**Before returning:** Check that the reported results match actual observations. A missing or unexecuted check is not a pass. Do not edit the specification, authorize execution, or issue your own completion receipt.
+**Output:** Existing `_fixture_validation.json` record and evidence references. The result answers "is the approved build/test baseline adequate?", **not** "does the completed product work?".
 
-**Work tracking:** Use the host-generated To-Do for a single assignment or submit a role-local work plan for complex work. Report each action's actual status and evidence. To-Do records do not authorize execution.
+**Migration boundary:** The current contract/runtime still describe narrower executable fixtures and interruption checks. Treat those declarations as implementation drift requiring an evidence-tested migration, not as authority to move final E2E or executable chaos testing before approval.

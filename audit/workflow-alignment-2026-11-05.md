@@ -52,3 +52,23 @@
 **Scanner scope:** The eight Planning issue types are compatibility, dependency, interface, concurrency, security, recovery, buildability and verifiability. Overlap, duplication, ownership drift and missing contracts are cross-cutting structural findings, not extra top-level stages. Scanner reports findings; Planning resolves them.
 
 **Status:** Presentation and naming have documentation-level corrections only. The connected workflow is **not READY** on this evidence. CI success verifies the configured checks, not an actual full workflow run.
+
+## 2026-11-05T19:10:17-08:00 — Evidence update (append-only)
+
+**One-line finding:** Discovery PRE → MCP Research → Discovery POST is now implemented and fixture-tested on the Continuing feature branch; the complete Build workflow is still unverified.
+
+- **Source:** [draft PR #3](https://github.com/itz1508/OneShot-Continuing/pull/3); original Continuing checkpoint `13720b7495d2ef86897ad9f13046b563c0969c5f`.
+- **Changed runtime:** PRE prepares synthetic Catalog-guided questions and a verified Research request from user intent and generated message ID. Existing Host dispatch and Research execution remain authority. POST ingests Research claims without planning or action selection; Host Audit transition requires matching PRE/POST artifacts and stable observations.
+- **Current limitations:** Source observation is bounded; summary is extractive; POST is not the canonical Audit Discovery codebase assessment; scanning memory/thread history is unimplemented. Scanner remains under Planning and does not itself authorize Build.
+- **Validation:** CI Python, Host integrity, MVP backend/frontend and Research/Audit checks confirmed successful at the code revisions above. The Chromium fixture-based browser scenario is separately pending and cannot be claimed verified. This does not establish complete Build-through-independent-E2E readiness.
+
+## 2026-11-06T01:06:45-08:00 — Current decision supersedes historical workflow proposal
+
+**One-line decision:** The user rejected standalone Package Lock and Build Admission stages, duplicate controllers, premature executable chaos testing, and speculative file structure. [README.md](../README.md#workflow-and-authority) is the current target architecture; the preceding audit remains historical **implementation evidence only**.
+
+- Runtime / Controller encloses the complete lifecycle; all roles return results to it. Audit PRE is read-only local discovery; Research request preparation is Host-bound; Researcher supplies sourced external evidence; Audit POST maps and preserves source conflicts; Planning owns design/refactoring planning, gap correction, and its Scanner loop.
+- Build Baseline / Fixture Validation verifies required source/dependencies/configuration/assets/criteria and defines chaos/fault/recovery scenarios **before user approval**; executable chaos tests occur after actual Build, in independent isolation.
+- Exact-revision + source-checkpoint user approval precedes Build; `memory_prelight` captures the immutable approved context. Builder prepares candidate patches; Host controls scheduling, Preflight, Sandbox and effects. Integration is part of independent validation, not a separate stage. Verified source promotion and `memory_validation` follow independent E2E.
+- **Rejected for target:** standalone `package_lock`, `build_admission`, `Task Integration` stages; second `orchestrator.py`; invented `approval.py`, `preflight.py`, `sandbox_gateway.py` without producer/consumer evidence. Standard `uv.lock` and `web/package-lock.json` are unaffected.
+- **Migration gap (NOT EXECUTED):** legacy `PackageLockReceipt` / `BuildAdmissionReceipt` remain required by `agent/runtime/effect_executor.py`, `agent/runtime/controller.py`, Build contracts, YAML, and tests. Keep fail-closed behavior until Host approval/Preflight rechecks are implemented and verified with negative authorization, source drift, crash reconciliation and E2E tests.
+- **Evidence:** Reviewed PR #3 head `7688a4cbb7983e6fbfc7ab02ef3b90af8076128c` and current source. This is an architecture/documentation revision, **not** a claim that implementation has been migrated or full Build E2E run.

@@ -2,7 +2,7 @@
 
 ## Rule
 
-Follow the admitted Planning request. Start with the host-generated To-Do, or submit a role-local work plan for complex work. Track every accepted requirement, Audit Discovery finding, CodeIntent, design decision, Build action, validation check, and unresolved issue. Work tracking does not authorize effects.
+Follow the Host-routed Planning request. Start with the host-generated To-Do, or submit a role-local work plan for complex work. Track every accepted requirement, Audit Discovery finding, CodeIntent, design decision, Build action, validation check, and unresolved issue. Work tracking does not authorize effects.
 
 ## Input
 
@@ -22,10 +22,10 @@ The host runs Structural Gap Analysis against the exact candidate before Scanner
 
 Review every host finding. If any pass is not valid, revise the Planning candidate, create a new candidate revision, and request all gap passes again. Do not reuse a result or receipt from an older candidate. Scanner remains blocked until the exact candidate has a completed structural result with no findings, full historical-gap detection, walking-skeleton evidence, source-grounded evidence, comparable-system completion, and a verified host receipt.
 
-After the structural gate passes, request Scanner for that same candidate. Resolve supported Scanner findings in another candidate revision and rerun every affected gap pass before requesting Scanner again. The host owns gap execution, Scanner, persistence, receipts, freeze, and transition.
+After the structural gate passes, request Scanner for that same candidate. Resolve supported Scanner findings in another candidate revision and rerun every affected gap pass before requesting Scanner again. The Host owns gap execution, Scanner execution, persistence, receipts, stage transition, and preservation of the reviewed approved specification.
 
 ## Output and success
 
 Submit one Planning result bound to the exact input request. Include every CodeIntent disposition, issue, design decision, action, dependency, fixture, validation invocation, requirement trace, candidate reference, and unresolved blocker.
 
-Success means the candidate is complete enough for Build to execute without design decisions, the exact revision has passed the required host gap and Scanner gates, and the host can freeze it without unresolved structural references. Planning does not modify production source, execute fixtures, freeze or admit its own candidate, issue receipts, or report planned validation as passed.
+Success means the candidate is complete enough for Build to execute without design decisions, the exact revision has passed the required host gap and Scanner gates, and the Host can prepare it for baseline validation and exact-revision user approval without unresolved structural references. Planning does not modify production source, execute fixtures, approve its own candidate, issue receipts, or report planned validation as completed.
