@@ -329,9 +329,7 @@ class MVPService:
         if self.host.get_state(task_id) is None:
             raise MVPError("task not found")
         timeline: list[dict[str, object]] = []
-        for event in self.host.event_store.list(task_id):
-            if event["seq"] <= after:
-                continue
+        for event in self.host.event_store.list(task_id, after=after, limit=256):
             entry: dict[str, object] = {
                 "sequence": event["seq"],
                 "type": event["event_type"],

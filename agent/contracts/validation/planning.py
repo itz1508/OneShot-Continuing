@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter, deque
 from collections.abc import Callable
 from functools import lru_cache
 from time import perf_counter_ns
@@ -136,8 +137,8 @@ def validate_paths(spec: BuildSpecification) -> list[str]:
 
 # Bounded pure parsing: no evidence, authorization, timing or traces are cached.
 DEPENDENCY_PARSER_VERSION = "1"
-DEPENDENCY_RULE_VERSION = "1"
-DEPENDENCY_SCANNER_VERSION = "1"
+DEPENDENCY_RULE_VERSION = "2"
+DEPENDENCY_SCANNER_VERSION = "2"
 MAX_CACHED_SOURCE_BYTES = 262_144
 
 
@@ -166,6 +167,28 @@ def parse_action_dependency_facts(parser_version: str, source_bytes: bytes) -> t
     return tuple(facts)
 
 
+def _has_dependency_cycle(facts: tuple[tuple[str, tuple[str, ...]], ...]) -> bool:
+    """Observe cycles from parsed graph facts without recursive stack exhaustion."""
+    known_ids = {action_id for action_id, _ in facts}
+    outgoing: dict[str, set[str]] = {action_id: set() for action_id in known_ids}
+    indegree = dict.fromkeys(known_ids, 0)
+    for action_id, dependencies in facts:
+        for dependency in dependencies:
+            if dependency in known_ids and action_id not in outgoing[dependency]:
+                outgoing[dependency].add(action_id)
+                indegree[action_id] += 1
+    ready = deque(sorted(action_id for action_id, count in indegree.items() if count == 0))
+    visited = 0
+    while ready:
+        action_id = ready.popleft()
+        visited += 1
+        for successor in sorted(outgoing[action_id]):
+            indegree[successor] -= 1
+            if indegree[successor] == 0:
+                ready.append(successor)
+    return visited != len(known_ids)
+
+
 def scan_action_dependencies(
     source_bytes: bytes,
     target_ref: str,
@@ -173,55 +196,114 @@ def scan_action_dependencies(
     *,
     on_step: Callable[[ScannerTraceStep, ScannerFinding | None], None] | None = None,
 ) -> TracedDetectorResult:
-    """Emit actual dependency membership comparisons, not generated explanations."""
+    """Evaluate dependency membership, uniqueness and acyclicity from verified bytes."""
     before = parse_action_dependency_facts.cache_info()
     started = perf_counter_ns()
-    # Oversized inputs are analyzed but not retained in the bounded cache.
+    # Only pure parsing is cached, not invocation traces or authorization.
     if len(source_bytes) <= MAX_CACHED_SOURCE_BYTES:
         facts = parse_action_dependency_facts(DEPENDENCY_PARSER_VERSION, source_bytes)
     else:
         facts = parse_action_dependency_facts.__wrapped__(DEPENDENCY_PARSER_VERSION, source_bytes)
     duration = perf_counter_ns() - started
     after = parse_action_dependency_facts.cache_info()
+    if not facts:
+        raise ValueError("candidate has no actions to validate")
+
     known_ids = {action_id for action_id, _ in facts}
     traces: list[ScannerTraceStep] = []
     findings: list[ScannerFinding] = []
+
+    def emit(
+        check_id: str,
+        target: str,
+        observed: bool | int,
+        expected: bool | int,
+        reason: str,
+        finding: ScannerFinding | None = None,
+    ) -> None:
+        satisfied = type(observed) is type(expected) and observed == expected
+        step = ScannerTraceStep(
+            check_id=check_id,
+            rule_version=DEPENDENCY_RULE_VERSION,
+            scanner_version=DEPENDENCY_SCANNER_VERSION,
+            target_ref=target,
+            observation_state=ObservationState.KNOWN,
+            observed_value=observed,
+            operator="equals",
+            expected_value=expected,
+            criterion_result=CriterionResult.SATISFIED if satisfied else CriterionResult.NOT_SATISFIED,
+            criterion_validity=CriterionValidity.VALID if satisfied else CriterionValidity.NOT_VALID,
+            evidence_refs=(evidence_ref,),
+            reason=reason,
+        )
+        traces.append(step)
+        if finding is not None:
+            findings.append(finding)
+        # Real-time observer receives the actual step, not a post-hoc reconstruction.
+        if on_step is not None:
+            on_step(step, finding)
+
+    counts = Counter(action_id for action_id, _ in facts)
+    for action_id in dict.fromkeys(action_id for action_id, _ in facts):
+        count = counts[action_id]
+        emit(
+            "dependency_unique_ids",
+            f"{target_ref}:action:{action_id}",
+            count,
+            1,
+            "Action identifiers must occur exactly once",
+            ScannerFinding(
+                finding_id=f"duplicate-action:{action_id}",
+                capability="dependency_readiness",
+                severity="error",
+                message=f"Action identifier {action_id} occurs {count} times",
+                location=f"action:{action_id}",
+                evidence_ref=evidence_ref,
+            )
+            if count > 1
+            else None,
+        )
+
+    has_cycle = _has_dependency_cycle(facts)
+    emit(
+        "dependency_acyclic",
+        f"{target_ref}:graph",
+        not has_cycle,
+        True,
+        "Action dependencies must form an acyclic graph",
+        ScannerFinding(
+            finding_id="cyclic-dependency:graph",
+            capability="dependency_readiness",
+            severity="error",
+            message="Action dependency graph contains a cycle",
+            location="graph",
+            evidence_ref=evidence_ref,
+        )
+        if has_cycle
+        else None,
+    )
+
     for action_id, dependencies in facts:
-        # An empty dependency set is a known, vacuously satisfied observation.
+        # No declared dependencies is a known, vacuously satisfied observation.
         for dependency in dependencies or ("",):
             observed = not dependency or _dependency_exists(dependency, known_ids)
-            traces.append(
-                ScannerTraceStep(
-                    check_id="dependency_readiness",
-                    rule_version=DEPENDENCY_RULE_VERSION,
-                    scanner_version=DEPENDENCY_SCANNER_VERSION,
-                    target_ref=f"{target_ref}:action:{action_id}",
-                    observation_state=ObservationState.KNOWN,
-                    observed_value=bool(observed),
-                    operator="equals",
-                    expected_value=True,
-                    criterion_result=CriterionResult.SATISFIED if observed else CriterionResult.NOT_SATISFIED,
-                    criterion_validity=CriterionValidity.VALID if observed else CriterionValidity.NOT_VALID,
-                    evidence_refs=(evidence_ref,),
-                    reason="No dependencies declared" if not dependency else f"Dependency reference: {dependency}",
+            emit(
+                "dependency_readiness",
+                f"{target_ref}:action:{action_id}",
+                bool(observed),
+                True,
+                "No dependencies declared" if not dependency else f"Dependency reference: {dependency}",
+                ScannerFinding(
+                    finding_id=f"missing-dependency:{action_id}:{dependency}",
+                    capability="dependency_readiness",
+                    severity="error",
+                    message=f"Action {action_id} references absent action {dependency}",
+                    location=f"action:{action_id}",
+                    evidence_ref=evidence_ref,
                 )
+                if not observed
+                else None,
             )
-            if not observed:
-                findings.append(
-                    ScannerFinding(
-                        finding_id=f"missing-dependency:{action_id}:{dependency}",
-                        capability="dependency_readiness",
-                        severity="error",
-                        message=f"Action {action_id} references absent action {dependency}",
-                        location=f"action:{action_id}",
-                        evidence_ref=evidence_ref,
-                    )
-                )
-            # Publish the actual observed comparison before advancing to the next one.
-            if on_step is not None:
-                on_step(traces[-1], findings[-1] if not observed else None)
-    if not facts:
-        raise ValueError("candidate has no actions to validate")
     return TracedDetectorResult(
         findings=tuple(findings),
         trace_steps=tuple(traces),

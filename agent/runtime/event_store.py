@@ -51,14 +51,21 @@ class EventStore:
         finally:
             conn.close()
 
-    def list(self, task_id: str) -> list[dict[str, Any]]:
-        """List events for a task, ordered by sequence."""
+    def list(self, task_id: str, after: int = 0, limit: int | None = None) -> list[dict[str, Any]]:
+        """Read ordered history from a sequence cursor; optionally bound one page."""
+        if after < 0 or (limit is not None and limit < 1):
+            raise ValueError("invalid event history cursor or page size")
         conn = sqlite3.connect(str(self.db_path))
         try:
-            rows = conn.execute(
-                "SELECT seq, event_type, event_data, created_at FROM events WHERE task_id = ? ORDER BY seq",
-                (task_id,),
-            ).fetchall()
+            query = (
+                "SELECT seq, event_type, event_data, created_at FROM events "
+                "WHERE task_id = ? AND seq > ? ORDER BY seq"
+            )
+            params: tuple[str | int, ...] = (task_id, after)
+            if limit is not None:
+                query += " LIMIT ?"
+                params = (task_id, after, limit)
+            rows = conn.execute(query, params).fetchall()
             return [{"seq": r[0], "event_type": r[1], "event_data": r[2], "created_at": r[3]} for r in rows]
         finally:
             conn.close()

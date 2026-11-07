@@ -48,6 +48,12 @@ class ScannerRunInput(ContractModel):
     gap_result_ref: ArtifactRef
     gap_receipt_ref: ReceiptRef
 
+    @model_validator(mode="after")
+    def verify_capabilities(self) -> ScannerRunInput:
+        if len(set(self.capabilities)) != len(self.capabilities):
+            raise ValueError("Scanner capabilities must be unique")
+        return self
+
 
 class ScannerFinding(ContractModel):
     finding_id: str = Field(min_length=1)

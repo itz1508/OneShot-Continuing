@@ -284,14 +284,18 @@ class HostController:
         detail = {"scan_id": scan_id, "run_id": run_id, **payload}
         sequence = self.event_store.append(task_id, event_type, json.dumps(detail, sort_keys=True))
         if observer is not None:
-            observer(
-                {
-                    "sequence": sequence,
-                    "type": event_type,
-                    "message": detail["message"],
-                    "detail": detail,
-                }
-            )
+            try:
+                observer(
+                    {
+                        "sequence": sequence,
+                        "type": event_type,
+                        "message": detail["message"],
+                        "detail": detail,
+                    }
+                )
+            except Exception:
+                # Delivery to an optional CLI observer cannot change host decisions.
+                pass
 
     def scan_planning_candidate(
         self,

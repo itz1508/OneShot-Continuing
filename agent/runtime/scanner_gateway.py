@@ -125,7 +125,10 @@ class ScannerGateway:
 
         def publish(event_type: str, message: str, **details: object) -> None:
             if on_event is not None:
-                on_event(event_type, {"message": message, **details})
+                try:
+                    on_event(event_type, {"message": message, **details})
+                except Exception as exc:
+                    raise ScannerGatewayError("scanner event persistence failed") from exc
 
         def report(
             capability: str,
@@ -164,29 +167,30 @@ class ScannerGateway:
 
         unsupported = [c for c in capabilities if c not in self._registered_capabilities]
         if unsupported:
-            for capability in unsupported:
+            for capability in capabilities:
                 publish(
                     "scanner_capability",
-                    f"{capability}: unsupported capability",
+                    f"{capability}: scan not executed because capabilities are unsupported",
                     capability=capability,
                     status="not_checked",
                 )
             return ScannerResult(
                 request_id=f"scan-{candidate_ref.artifact_id}",
                 outcome=ScannerOutcome.BLOCKED,
-                capabilities_checked=tuple(c for c in capabilities if c in self._registered_capabilities),
-                capabilities_not_checked=tuple(unsupported),
+                capabilities_checked=(),
+                capabilities_not_checked=capabilities,
                 limitation_reasons=tuple(f"unsupported capability: {c}" for c in unsupported),
             )
 
-        # No capabilities requested — nothing to verify
+        # Empty requests cannot demonstrate readiness or a valid check.
         if not capabilities:
             return ScannerResult(
                 request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                outcome=ScannerOutcome.PASS,
+                outcome=ScannerOutcome.NOT_RUN,
                 capabilities_checked=(),
                 capabilities_not_checked=(),
                 findings=(),
+                limitation_reasons=("no capabilities requested",),
             )
 
         # Always verify current immutable storage before using cached source facts.
@@ -261,6 +265,8 @@ class ScannerGateway:
                     assert detector is not None
                     findings = detector(artifact_bytes)
                     report(cap, (), (), findings)
+            except ScannerGatewayError:
+                raise
             except Exception:
                 not_checked.append(cap)
                 reason = f"detector unavailable or malformed evidence for {cap}"
