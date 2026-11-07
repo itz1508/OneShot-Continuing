@@ -17,6 +17,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from agent.contracts.scanner import ScannerRunInput
+from agent.runtime.controller import TransitionError
 from agent.runtime.providers.base import ProviderError
 from agent.runtime.scanner_telemetry import configure_logfire
 from mvp.connector_store import (
@@ -68,7 +70,7 @@ app.add_middleware(
     allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["Content-Type", "Last-Event-ID"],
+    allow_headers=["Content-Type", "Last-Event-ID", "X-Operator-Token"],
 )
 service = MVPService(DEFAULT_ROOT)
 logger = logging.getLogger(__name__)
@@ -255,6 +257,19 @@ def start_audit(task_id: str) -> dict[str, object]:
         if str(exc).startswith("Audit execution blocked:"):
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         raise failure(exc) from exc
+
+
+@app.post("/api/tasks/{task_id}/scanner")
+def start_scanner(task_id: str, input: ScannerRunInput, request: Request) -> dict[str, object]:
+    """Execute the exact host scanner with independently verified Planning evidence."""
+    require_operator(request)
+    try:
+        result = service.scan_candidate(task_id, input)
+    except MVPError as exc:
+        raise failure(exc) from exc
+    except TransitionError as exc:
+        raise HTTPException(status_code=409, detail="Scanner blocked by host evidence validation") from exc
+    return result.model_dump(mode="json")
 
 
 @app.get("/api/tasks/{task_id}")

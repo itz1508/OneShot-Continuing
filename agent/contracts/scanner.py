@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from agent.contracts.common import ArtifactRef, ContractModel, Sha256
+from agent.contracts.host import ReceiptRef
 
 
 class ScannerOutcome(StrEnum):
@@ -35,6 +36,17 @@ class ScannerRequest(ContractModel):
     specification_digest: Sha256
     repository_source: str = Field(min_length=1)
     requested_capabilities: tuple[str, ...] = Field(min_length=1)
+
+
+class ScannerRunInput(ContractModel):
+    """Exact, host-verifiable scanner invocation used by API and CLI."""
+
+    run_id: str = Field(min_length=1)
+    candidate_ref: ArtifactRef
+    repository_identity: str = Field(min_length=1)
+    capabilities: tuple[str, ...] = Field(min_length=1, max_length=16)
+    gap_result_ref: ArtifactRef
+    gap_receipt_ref: ReceiptRef
 
 
 class ScannerFinding(ContractModel):

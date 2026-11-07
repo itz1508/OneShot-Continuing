@@ -6,7 +6,8 @@ import json
 import sys
 from pathlib import Path
 
-from agent.runtime.controller import HostController, Stage
+from agent.contracts.scanner import ScannerOutcome, ScannerRunInput
+from agent.runtime.controller import HostController, Stage, TransitionError
 
 
 def cmd_doctor(state_root: str = "/tmp/oneshot-state") -> int:
@@ -75,6 +76,31 @@ def cmd_run(task_id: str, state_root: str = "/tmp/oneshot-state") -> int:
     return 0
 
 
+def cmd_scan(task_id: str, request_file: str, state_root: str = "/tmp/oneshot-state") -> int:
+    """Run the API's exact host scanner and print persisted events as JSON lines."""
+    from pydantic import ValidationError
+
+    from mvp.service import MVPError, MVPService
+
+    try:
+        request = ScannerRunInput.model_validate_json(Path(request_file).read_bytes())
+    except (OSError, ValidationError) as exc:
+        print(f"Invalid scanner request file: {type(exc).__name__}", file=sys.stderr)
+        return 1
+
+    def show(event: dict[str, object]) -> None:
+        print(json.dumps(event, sort_keys=True), flush=True)
+
+    try:
+        result = MVPService(state_root).scan_candidate(task_id, request, on_event=show)
+    except (MVPError, TransitionError) as exc:
+        print(f"Scanner blocked: {exc}", file=sys.stderr)
+        return 1
+
+    print(json.dumps({"type": "scanner_result", "result": result.model_dump(mode="json")}, sort_keys=True))
+    return 0 if result.outcome is ScannerOutcome.PASS else 2
+
+
 def cmd_status(task_id: str, state_root: str = "/tmp/oneshot-state") -> int:
     """Show task status."""
     controller = HostController(state_root)
@@ -116,7 +142,7 @@ def main() -> int:
     """Main CLI entrypoint."""
     if len(sys.argv) < 2:
         print("Usage: python -m agent <command> [args]")
-        print("Commands: doctor, run <existing-task-id>, status, resume, verify")
+        print("Commands: doctor, run <existing-task-id>, scan <task-id> <request.json> [--state-root PATH], status, resume, verify")
         return 1
 
     cmd = sys.argv[1]
@@ -128,6 +154,15 @@ def main() -> int:
             print("Usage: python -m agent run <task_id>")
             return 1
         return cmd_run(sys.argv[2])
+    elif cmd == "scan":
+        from argparse import ArgumentParser
+
+        parser = ArgumentParser(prog="python -m agent scan")
+        parser.add_argument("task_id")
+        parser.add_argument("request_file")
+        parser.add_argument("--state-root", default="/tmp/oneshot-state")
+        args = parser.parse_args(sys.argv[2:])
+        return cmd_scan(args.task_id, args.request_file, args.state_root)
     elif cmd == "status":
         if len(sys.argv) < 3:
             print("Usage: python -m agent status <task_id>")

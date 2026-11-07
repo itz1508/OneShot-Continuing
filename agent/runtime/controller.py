@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
@@ -269,6 +271,28 @@ class HostController:
             raise TransitionError("structural gap pass belongs to a different candidate")
         return result
 
+    def _publish_scanner_event(
+        self,
+        task_id: str,
+        run_id: str,
+        scan_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        observer: Callable[[dict[str, object]], None] | None = None,
+    ) -> None:
+        """Append first; observers only receive events already persisted by the host."""
+        detail = {"scan_id": scan_id, "run_id": run_id, **payload}
+        sequence = self.event_store.append(task_id, event_type, json.dumps(detail, sort_keys=True))
+        if observer is not None:
+            observer(
+                {
+                    "sequence": sequence,
+                    "type": event_type,
+                    "message": detail["message"],
+                    "detail": detail,
+                }
+            )
+
     def scan_planning_candidate(
         self,
         task_id: str,
@@ -278,15 +302,50 @@ class HostController:
         capabilities: tuple[str, ...],
         gap_result_ref: ArtifactRef | None,
         gap_receipt_ref: ReceiptRef | None,
+        *,
+        on_event: Callable[[dict[str, object]], None] | None = None,
     ) -> ScannerResult:
-        """Host Scanner dispatch; persist a fresh invocation after gap verification."""
+        """Host dispatch, append real check events, and persist the authoritative result."""
         self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
-        with scanner_span(task_id, run_id, candidate_ref.artifact_id):
-            result = self.scanner.scan_exact(candidate_ref, repository_identity, capabilities)
         scan_id = f"scanner-{uuid4().hex}"
-        result = result.model_copy(update={"request_id": scan_id, "candidate_ref": candidate_ref})
-        self.artifact_store.put_immutable(result, scan_id, 1, "scanner_result", "1.1")
+
+        def publish(event_type: str, payload: dict[str, object]) -> None:
+            self._publish_scanner_event(task_id, run_id, scan_id, event_type, payload, on_event)
+
+        publish(
+            "scanner_started",
+            {
+                "message": "Scanner invocation started",
+                "candidate_id": candidate_ref.artifact_id,
+                "candidate_revision": candidate_ref.artifact_revision,
+                "capabilities": list(capabilities),
+            },
+        )
+        try:
+            with scanner_span(task_id, run_id, candidate_ref.artifact_id):
+                result = self.scanner.scan_exact(
+                    candidate_ref, repository_identity, capabilities, on_event=publish
+                )
+            result = result.model_copy(update={"request_id": scan_id, "candidate_ref": candidate_ref})
+            digest = self.artifact_store.put_immutable(result, scan_id, 1, "scanner_result", "1.1")
+        except Exception:
+            publish("scanner_interrupted", {"message": "Scanner invocation interrupted before result persistence"})
+            raise
+
         self.event_store.append(task_id, "scanner_recorded", scan_id)
+        publish(
+            "scanner_completed",
+            {
+                "message": f"Scanner result recorded: {result.outcome.value}",
+                "outcome": result.outcome.value,
+                "result_ref": {"artifact_id": scan_id, "artifact_revision": 1, "artifact_digest": digest},
+                "finding_count": len(result.findings),
+                "evidence_request_count": len(result.evidence_requests),
+                "cache_hits": result.cache_hits,
+                "cache_misses": result.cache_misses,
+                "parse_duration_ns": result.parse_duration_ns,
+            },
+        )
         return result
 
     def repair_planning_draft(
@@ -385,15 +444,44 @@ class HostController:
         before["candidate"]["specification_revision"] = after["candidate"]["specification_revision"]
         if before != after:
             raise TransitionError("repair changed source, requirements, approvals, or unrelated fields")
-        revision, digest = self.artifact_store.put_cas(
-            proposed_record,
-            current_ref.artifact_id,
-            expected_revision=current_ref.artifact_revision,
-            contract_id=current_ref.contract_id,
-            contract_version=current_ref.contract_version,
+        self._publish_scanner_event(
+            task_id,
+            run_id,
+            recorded_scan.request_id,
+            "scanner_repair_started",
+            {"message": "Authorized dependency repair started", "candidate_id": current_ref.artifact_id},
         )
+        try:
+            revision, digest = self.artifact_store.put_cas(
+                proposed_record,
+                current_ref.artifact_id,
+                expected_revision=current_ref.artifact_revision,
+                contract_id=current_ref.contract_id,
+                contract_version=current_ref.contract_version,
+            )
+        except Exception:
+            self._publish_scanner_event(
+                task_id,
+                run_id,
+                recorded_scan.request_id,
+                "scanner_repair_interrupted",
+                {"message": "Dependency repair did not persist"},
+            )
+            raise
         updated_ref = current_ref.model_copy(update={"artifact_revision": revision, "artifact_digest": digest})
         self.event_store.append(task_id, "draft_plan_repaired", updated_ref.artifact_id)
+        self._publish_scanner_event(
+            task_id,
+            run_id,
+            recorded_scan.request_id,
+            "scanner_repair_completed",
+            {
+                "message": "Authorized dependency repair recorded",
+                "candidate_id": updated_ref.artifact_id,
+                "candidate_revision": revision,
+                "candidate_digest": digest,
+            },
+        )
         return updated_ref
 
     def run_structural_gap_analysis(

@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 # Type alias: a detector takes artifact bytes and returns findings (empty = pass)
 DetectorFn = Callable[[bytes], tuple[ScannerFinding, ...]]
 TracedDetectorFn = Callable[[bytes, str, str], TracedDetectorResult]
+ScannerEventSink = Callable[[str, dict[str, object]], None]
 
 
 class ScannerGatewayError(Exception):
@@ -112,6 +113,8 @@ class ScannerGateway:
         candidate_ref: ArtifactRef,
         repository_identity: str,
         capabilities: tuple[str, ...],
+        *,
+        on_event: ScannerEventSink | None = None,
     ) -> ScannerResult:
         """Scan exact candidate bytes for requested capabilities.
 
@@ -119,8 +122,54 @@ class ScannerGateway:
         matches the expected digest in the candidate_ref. Returns BLOCKED
         if the artifact store is unavailable or the artifact cannot be verified.
         """
+        def publish(event_type: str, message: str, **details: object) -> None:
+            if on_event is not None:
+                on_event(event_type, {"message": message, **details})
+
+        def report(
+            capability: str,
+            steps: tuple[ScannerTraceStep, ...],
+            requests: tuple[ScannerEvidenceRequest, ...],
+            findings: tuple[ScannerFinding, ...],
+        ) -> None:
+            for step in steps:
+                publish(
+                    "scanner_check",
+                    f"{capability}: {step.criterion_result.value} ({step.criterion_validity.value})",
+                    capability=capability,
+                    check_id=step.check_id,
+                    target_ref=step.target_ref,
+                    observation_state=step.observation_state.value,
+                    criterion_result=step.criterion_result.value,
+                    criterion_validity=step.criterion_validity.value,
+                    required=step.required,
+                )
+            for request in requests:
+                publish(
+                    "scanner_evidence_requested",
+                    f"{capability}: evidence required",
+                    capability=capability,
+                    check_id=request.check_id,
+                    target_ref=request.target_ref,
+                )
+            for finding in findings:
+                publish(
+                    "scanner_finding",
+                    f"{capability}: finding {finding.finding_id}",
+                    capability=capability,
+                    finding_id=finding.finding_id,
+                    severity=finding.severity,
+                )
+
         unsupported = [c for c in capabilities if c not in self._registered_capabilities]
         if unsupported:
+            for capability in unsupported:
+                publish(
+                    "scanner_capability",
+                    f"{capability}: unsupported capability",
+                    capability=capability,
+                    status="not_checked",
+                )
             return ScannerResult(
                 request_id=f"scan-{candidate_ref.artifact_id}",
                 outcome=ScannerOutcome.BLOCKED,
@@ -140,13 +189,24 @@ class ScannerGateway:
             )
 
         # Always verify current immutable storage before using cached source facts.
+        def unknown(reason: str) -> ScannerResult:
+            result = self._unknown(candidate_ref, capabilities, reason)
+            for capability in capabilities:
+                report(
+                    capability,
+                    tuple(step for step in result.trace_steps if step.check_id == capability),
+                    tuple(request for request in result.evidence_requests if request.check_id == capability),
+                    (),
+                )
+            return result
+
         if self._artifact_store is None:
-            return self._unknown(candidate_ref, capabilities, "no artifact store configured for content verification")
+            return unknown("no artifact store configured for content verification")
         stored_digest = self._artifact_store.get_digest(candidate_ref.artifact_id, candidate_ref.artifact_revision)
         if stored_digest is None:
-            return self._unknown(candidate_ref, capabilities, "artifact not found in store")
+            return unknown("artifact not found in store")
         if stored_digest != candidate_ref.artifact_digest:
-            return self._unknown(candidate_ref, capabilities, "content digest mismatch")
+            return unknown("content digest mismatch")
 
         # Trace and authorization bindings are created fresh on each invocation.
         all_findings: list[ScannerFinding] = []
@@ -165,6 +225,7 @@ class ScannerGateway:
             if detector is None and traced_detector is None:
                 not_checked.append(cap)
                 reasons.append(f"no detector registered for capability: {cap}")
+                publish("scanner_capability", f"{cap}: detector unavailable", capability=cap, status="not_checked")
                 continue
             try:
                 artifact_bytes = self._artifact_store.get_verified(
@@ -177,12 +238,14 @@ class ScannerGateway:
                     findings = result.findings
                     traces.extend(result.trace_steps)
                     evidence_requests.extend(result.evidence_requests)
+                    report(cap, result.trace_steps, result.evidence_requests, findings)
                     cache_hits += result.cache_hits
                     cache_misses += result.cache_misses
                     parse_duration_ns += result.parse_duration_ns
                 else:
                     assert detector is not None
                     findings = detector(artifact_bytes)
+                    report(cap, (), (), findings)
             except Exception:
                 not_checked.append(cap)
                 reason = f"detector unavailable or malformed evidence for {cap}"
@@ -191,10 +254,26 @@ class ScannerGateway:
                     unresolved = self._unknown(candidate_ref, (cap,), reason)
                     traces.extend(unresolved.trace_steps)
                     evidence_requests.extend(unresolved.evidence_requests)
+                    report(cap, unresolved.trace_steps, unresolved.evidence_requests, ())
+                publish("scanner_capability", f"{cap}: detector could not check evidence", capability=cap, status="not_checked")
                 continue
             checked.append(cap)
             all_findings.extend(findings)
+            publish(
+                "scanner_capability",
+                f"{cap}: checked {len(findings)} findings",
+                capability=cap,
+                status="checked",
+                finding_count=len(findings),
+            )
 
+        publish(
+            "scanner_cache_metrics",
+            "Scanner parser cache observations",
+            cache_hits=cache_hits,
+            cache_misses=cache_misses,
+            parse_duration_ns=parse_duration_ns,
+        )
         return ScannerResult(
             request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
             outcome=(

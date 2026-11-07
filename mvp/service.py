@@ -6,11 +6,12 @@ fabricated Research/Audit/Plan completion records.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,10 +20,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from agent.contracts.scanner import ScannerResult, ScannerRunInput
 from agent.contracts.work_todo import WorkStatus
 from agent.runtime.artifact_store import ArtifactStore, StaleRevisionError
 from agent.runtime.authorization import Capability
-from agent.runtime.controller import HostController
+from agent.runtime.controller import HostController, Stage
 from agent.runtime.work_todo import WorkTodoManager
 from mvp.mcp_research import register_mcp_research, research_artifact_id
 
@@ -293,22 +295,59 @@ class MVPService:
         self.host.event_store.append(task_id, "mvp_input_revised", f"input revision {expected_revision + 1}")
         return self.get(task_id)
 
+    def scan_candidate(
+        self,
+        task_id: str,
+        request: ScannerRunInput,
+        *,
+        on_event: Callable[[dict[str, object]], None] | None = None,
+    ) -> ScannerResult:
+        """Shared API/CLI adapter; only the HostController executes scanner checks."""
+        self._check_id(task_id)
+        state = self.host.get_state(task_id)
+        if state is None:
+            raise MVPError("task not found")
+        if state.current_stage is not Stage.PLANNING:
+            raise MVPError("Scanner requires the active Planning stage")
+        if state.run_id != request.run_id:
+            raise MVPError("scanner request run mismatch")
+        return self.host.scan_planning_candidate(
+            task_id,
+            request.run_id,
+            request.candidate_ref,
+            request.repository_identity,
+            request.capabilities,
+            request.gap_result_ref,
+            request.gap_receipt_ref,
+            on_event=on_event,
+        )
+
     def events(self, task_id: str, after: int = 0) -> list[dict[str, object]]:
         self._check_id(task_id)
         if after < 0:
             raise MVPError("invalid event cursor")
         if self.host.get_state(task_id) is None:
             raise MVPError("task not found")
-        return [
-            {
+        timeline: list[dict[str, object]] = []
+        for event in self.host.event_store.list(task_id):
+            if event["seq"] <= after:
+                continue
+            entry: dict[str, object] = {
                 "sequence": event["seq"],
                 "type": event["event_type"],
                 "message": event["event_data"],
                 "created_at": event["created_at"],
             }
-            for event in self.host.event_store.list(task_id)
-            if event["seq"] > after
-        ]
+            if event["event_type"].startswith("scanner_"):
+                try:
+                    detail = json.loads(event["event_data"])
+                except (ValueError, TypeError):
+                    detail = None
+                if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+                    entry["message"] = detail["message"]
+                    entry["detail"] = detail
+            timeline.append(entry)
+        return timeline
 
     def artifacts_for_task(self, task_id: str) -> list[dict[str, object]]:
         record, revision, digest = self.read_input(task_id)
