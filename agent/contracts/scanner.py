@@ -90,9 +90,12 @@ class ScannerTraceStep(ContractModel):
             self.criterion_result is not CriterionResult.SATISFIED or not self.evidence_refs
         ):
             raise ValueError("valid checklist criteria require satisfaction and evidence")
-        if self.required and self.criterion_result is CriterionResult.UNKNOWN:
-            if self.criterion_validity is not CriterionValidity.NOT_VALID:
-                raise ValueError("unknown required criteria cannot be valid")
+        if (
+            self.required
+            and self.criterion_result is CriterionResult.UNKNOWN
+            and self.criterion_validity is not CriterionValidity.NOT_VALID
+        ):
+            raise ValueError("unknown required criteria cannot be valid")
         return self
 
 
