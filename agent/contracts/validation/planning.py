@@ -346,6 +346,7 @@ def repair_plan_draft(
     source_files: Mapping[str, str],
     *,
     allowed_paths: tuple[str, ...],
+    verified_evidence_refs: tuple[str, ...],
 ) -> CandidateSpecification:
     """Planner-controlled draft-only transformation; does not write source or approve.
 
@@ -356,7 +357,10 @@ def repair_plan_draft(
         raise ValueError("at least one repair directive is required")
     actions = list(candidate.build_spec.actions)
     allowed = set(allowed_paths)
+    verified = set(verified_evidence_refs)
     for directive in directives:
+        if directive.evidence_ref not in verified:
+            raise ValueError("repair evidence reference not independently verified")
         matching = [idx for idx, action in enumerate(actions) if action.action_id == directive.action_id]
         if len(matching) != 1:
             raise ValueError(f"action to repair not uniquely present: {directive.action_id}")
