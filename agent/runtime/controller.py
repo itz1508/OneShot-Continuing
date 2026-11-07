@@ -300,8 +300,6 @@ class HostController:
         principal: str = "planner",
     ) -> ArtifactRef:
         """CAS a bounded dependency repair; reject every other before/after edit."""
-        from agent.contracts.planning import PlanningRecord
-
         # Explicit external host grant; a scanner finding is not an authorization.
         self.authorization.authorize_tool(principal, Capability.WRITE, f"draft-plan:{task_id}")
         if not authorized_action_ids or len(set(authorized_action_ids)) != len(authorized_action_ids):
@@ -344,6 +342,10 @@ class HostController:
         }
         if not set(authorized_action_ids).issubset(observed_defects):
             raise TransitionError("repair scope is not backed by observed dependency defects")
+        try:
+            proposed_record = PlanningRecord.model_validate(proposed_record.model_dump(mode="json"))
+        except Exception as exc:
+            raise TransitionError("proposed draft plan fails contract validation") from exc
         if proposed_record.task_id != task_id or proposed_record.run_id != run_id:
             raise TransitionError("proposed draft task/run mismatch")
         if proposed_record.stage_revision != original.stage_revision + 1 or (
