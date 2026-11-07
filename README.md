@@ -51,7 +51,7 @@ Scanner identifies structural inconsistency—including overlap, duplication, ow
 | Buildability | Missing actions, unsupported tools, or blockers |
 | Verifiability | Missing fixtures, checks, criteria, or evidence |
 
-**Scanner reports; Planning resolves.** Material findings prevent the candidate from advancing. Document unresolved or accepted-risk items with evidence and disposition; repeat the relevant checks when a revision changes the candidate. The current Scanner gateway declares six technical capabilities, so automated coverage of all eight Planning issue categories must not be assumed.
+**Scanner reports; Planning resolves.** Material findings prevent the candidate from advancing. Document unresolved or accepted-risk items with evidence and disposition; repeat the relevant checks when a revision changes the candidate. The Scanner capability contract lists seven technical categories. The current gateway has an evidence-traced detector for `dependency_readiness`; the remaining categories and all eight Planning issue categories must not be assumed verified.
 
 ## Execution contract and artifacts
 
@@ -87,7 +87,9 @@ Completion requires independent evidence for accepted requirements, accounted-fo
 
 **Intended workflow:** The diagram and narrative above describe the target experience. **Declared workflow:** [`.agents/contracts/workflow.yaml`](.agents/contracts/workflow.yaml) currently registers Research → Audit Discovery → Planning → Fixture Validation → Build → Build Validation, plus internal structural checks, specification freeze, package lock, Build Admission, and integration operations. These implementation mechanisms are not additional user-facing stages.
 
-The current React/Vite and FastAPI MVP supports task input, persistence, SSE, MCP-backed Research integration, controlled input updates, and a separate read-only Audit capability. A connected Discovery-first workflow and complete Build-to-E2E execution have **not** been verified. The [standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md) has a separate integration boundary. Claims of working behavior must refer to the actual tested revision and evidence.
+The current React/Vite and FastAPI MVP supports task input, persistence, SSE, MCP-backed Research integration, controlled input updates, a separate read-only Audit capability, and a host-gated Scanner invocation for existing Planning tasks through HTTP, frontend, and CLI.
+
+**Scanner gap evaluation:** A fixed 20-case, three-state (`clear` / `defect` / `unknown`) fixture suite is evaluated independently with scikit-learn metrics during CI. The before/after results and remaining validation boundaries are recorded in [the Scanner gap audit](audit/scanner-gap-sklearn-2026-11-07.md). Scikit-learn is evaluation-only; Runtime readiness remains deterministic and receipt-gated. A connected Discovery-first workflow and complete Build-to-E2E execution have **not** been verified. The [standalone Modal Sandbox](deployment/modal/sandbox_v3/README.md) has a separate integration boundary. Claims of working behavior must refer to the actual tested revision and evidence.
 
 ## Get started
 

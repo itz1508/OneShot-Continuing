@@ -48,10 +48,41 @@ server. `GET /api/health` reports API reachability, not MCP connectivity.
 ## Current HTTP scope
 
 The MVP exposes task input, explicit Research execution, a read-only Audit
-capability, artifact reads, and events. Audit collects findings while the
-Research stage remains open. Later workflow stages have no MVP execution
-routes. An input edit creates a new immutable revision; it does not restart
+capability, artifact reads, events, and a host-gated Scanner invocation for an
+already active Planning task. Audit collects findings while Research remains
+open. The MVP cannot create Planning candidates or issue structural-gap receipts;
+later workflow stages have no general MVP execution routes. An input edit creates a new immutable revision; it does not restart
 Research automatically.
+
+## Planning Scanner — shared Runtime and SSE
+
+The host requires a real, current Planning task and a verified structural-gap
+result/receipt. Neither the API nor CLI creates or bypasses these prerequisites.
+The JSON request fields are `run_id`, `candidate_ref` (full `ArtifactRef`),
+`repository_identity`, `capabilities` (such as `["dependency_readiness"]`),
+`gap_result_ref` (full `ArtifactRef`), and `gap_receipt_ref` (host-issued
+`ReceiptRef`). Use exact host-issued values, not invented references.
+
+From the repository root, run the same authoritative scanner with:
+
+    uv run --no-sync python -m agent scan <task-id> scan-request.json --state-root .oneshot-state
+
+The React UI's **Scanner · Planning** control POSTs the same JSON to
+`/api/tasks/{task_id}/scanner`. When `ONESHOT_OPERATOR_TOKEN` is set, include
+`X-Operator-Token` on the HTTP request. The UI does not persist this token.
+
+Checks, findings, evidence requests, cache observations, and authorized
+draft-repair events are appended immediately to the existing EventStore.
+`GET /api/tasks/{task_id}/events?after=<sequence>` replays them, while
+`GET /api/tasks/{task_id}/stream` publishes them via the existing SSE cursor.
+CLI output is newline-delimited JSON from those persisted events.
+The final `ScannerResult` remains immutable in ArtifactStore and its digest is
+included in `scanner_completed`. Private source bytes and full finding messages
+are never copied into the event stream. CLI exits 0 for a clear scan, 2 for a
+completed scan with findings, and 1 for rejected input or host evidence.
+
+Only `dependency_readiness` has an evidence-traced detector in this slice.
+Planning-to-Build E2E acceptance remains independently unverified.
 
 ## Research integration
 

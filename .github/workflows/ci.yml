@@ -29,5 +29,11 @@ jobs:
         run: uv run --no-sync mypy agent
       - name: Validate Modal 1.6.3 ASGI image declaration (no cloud access)
         run: uv run --no-sync --with modal==1.6.3 python -c "import modal_app; assert modal_app.APP_NAME; print('Modal declaration OK')"
+      - name: Focused scanner regression
+        run: uv run --no-sync pytest -q tests/scanner/test_decision_trace.py tests/scanner/test_stream_events.py tests/e2e/test_mvp_scanner.py
+      - name: Scanner cache and legacy-oracle benchmark
+        run: uv run --no-sync python tests/scanner/benchmark_decision_trace.py
+      - name: Independent labeled Scanner gap evaluation (scikit-learn; no runtime dependency)
+        run: uv run --no-sync --with scikit-learn==1.8.0 python tests/scanner/evaluate_gap_sklearn.py
       - name: Tests
         run: uv run --no-sync pytest -q

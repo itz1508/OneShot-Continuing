@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
+from contextlib import suppress
 from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 from pydantic import BaseModel, Field
 
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import HostDispatchEnvelope, HostDispatchResult, ReceiptRef
-from agent.contracts.scanner import ScannerResult
+from agent.contracts.planning import PlanningRecord
+from agent.contracts.scanner import CriterionResult, ScannerOutcome, ScannerResult
+from agent.contracts.validation.planning import validate_action_graph
 from agent.contracts.work_todo import TodoList, WorkBinding
 from agent.runtime.artifact_store import ArtifactStore
-from agent.runtime.authorization import AuthorizationEngine
+from agent.runtime.authorization import AuthorizationEngine, Capability
 from agent.runtime.canonical_serialization import SERIALIZER_PROFILE
 from agent.runtime.checkpoint_store import CheckpointStore, CompetingWriterError
 from agent.runtime.event_store import EventStore
@@ -30,6 +36,7 @@ from agent.runtime.providers.registry import ProviderRegistry
 from agent.runtime.receipt_store import ReceiptStore
 from agent.runtime.recovery import BoundedRecovery
 from agent.runtime.scanner_gateway import ScannerGateway
+from agent.runtime.scanner_telemetry import scanner_span
 from agent.runtime.work_todo import WorkTodoError, WorkTodoManager
 
 
@@ -265,6 +272,30 @@ class HostController:
             raise TransitionError("structural gap pass belongs to a different candidate")
         return result
 
+    def _publish_scanner_event(
+        self,
+        task_id: str,
+        run_id: str,
+        scan_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        observer: Callable[[dict[str, object]], None] | None = None,
+    ) -> None:
+        """Append first; observers only receive events already persisted by the host."""
+        detail = {"scan_id": scan_id, "run_id": run_id, **payload}
+        sequence = self.event_store.append(task_id, event_type, json.dumps(detail, sort_keys=True))
+        if observer is not None:
+            # Delivery to an optional CLI observer cannot change host decisions.
+            with suppress(Exception):
+                observer(
+                    {
+                        "sequence": sequence,
+                        "type": event_type,
+                        "message": detail["message"],
+                        "detail": detail,
+                    }
+                )
+
     def scan_planning_candidate(
         self,
         task_id: str,
@@ -274,10 +305,185 @@ class HostController:
         capabilities: tuple[str, ...],
         gap_result_ref: ArtifactRef | None,
         gap_receipt_ref: ReceiptRef | None,
+        *,
+        on_event: Callable[[dict[str, object]], None] | None = None,
     ) -> ScannerResult:
-        """Host Scanner dispatch; always reject an unvalidated Planning candidate."""
+        """Host dispatch, append real check events, and persist the authoritative result."""
         self._verify_structural_gap(task_id, run_id, gap_result_ref, gap_receipt_ref, candidate_ref)
-        return self.scanner.scan_exact(candidate_ref, repository_identity, capabilities)
+        scan_id = f"scanner-{uuid4().hex}"
+
+        def publish(event_type: str, payload: dict[str, object]) -> None:
+            self._publish_scanner_event(task_id, run_id, scan_id, event_type, payload, on_event)
+
+        publish(
+            "scanner_started",
+            {
+                "message": "Scanner invocation started",
+                "candidate_id": candidate_ref.artifact_id,
+                "candidate_revision": candidate_ref.artifact_revision,
+                "capabilities": list(capabilities),
+            },
+        )
+        try:
+            with scanner_span(task_id, run_id, candidate_ref.artifact_id):
+                result = self.scanner.scan_exact(candidate_ref, repository_identity, capabilities, on_event=publish)
+            result = result.model_copy(update={"request_id": scan_id, "candidate_ref": candidate_ref})
+            digest = self.artifact_store.put_immutable(result, scan_id, 1, "scanner_result", "1.1")
+        except Exception:
+            publish("scanner_interrupted", {"message": "Scanner invocation interrupted before result persistence"})
+            raise
+
+        self.event_store.append(task_id, "scanner_recorded", scan_id)
+        publish(
+            "scanner_completed",
+            {
+                "message": f"Scanner result recorded: {result.outcome.value}",
+                "outcome": result.outcome.value,
+                "result_ref": {"artifact_id": scan_id, "artifact_revision": 1, "artifact_digest": digest},
+                "finding_count": len(result.findings),
+                "evidence_request_count": len(result.evidence_requests),
+                "cache_hits": result.cache_hits,
+                "cache_misses": result.cache_misses,
+                "parse_duration_ns": result.parse_duration_ns,
+            },
+        )
+        return result
+
+    def repair_planning_draft(
+        self,
+        task_id: str,
+        run_id: str,
+        current_ref: ArtifactRef,
+        scanner_result_ref: ArtifactRef,
+        proposed_record: PlanningRecord,
+        authorized_action_ids: tuple[str, ...],
+        *,
+        principal: str = "planner",
+    ) -> ArtifactRef:
+        """CAS a bounded dependency repair; reject every other before/after edit."""
+        # Explicit external host grant; a scanner finding is not an authorization.
+        self.authorization.authorize_tool(principal, Capability.WRITE, f"draft-plan:{task_id}")
+        if not authorized_action_ids or len(set(authorized_action_ids)) != len(authorized_action_ids):
+            raise TransitionError("explicit unique authorized action IDs required")
+        if self.artifact_store.latest_revision(current_ref.artifact_id) != current_ref.artifact_revision:
+            raise TransitionError("stale draft plan revision")
+        if self.artifact_store.get_digest(current_ref.artifact_id, current_ref.artifact_revision) != (
+            current_ref.artifact_digest
+        ):
+            raise TransitionError("draft artifact digest mismatch")
+        if current_ref.contract_id != "planning":
+            raise TransitionError("repair requires an existing PlanningRecord")
+        original = PlanningRecord.model_validate_json(
+            self.artifact_store.get_verified(current_ref.artifact_id, current_ref.artifact_revision)
+        )
+        if original.task_id != task_id or original.run_id != run_id:
+            raise TransitionError("draft task/run mismatch")
+        if original.freeze_receipt_ref or original.final_scanner_receipt_ref:
+            raise TransitionError("frozen or finalized plans cannot be repaired")
+
+        if scanner_result_ref.contract_id != "scanner_result" or (
+            self.artifact_store.get_digest(scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision)
+            != scanner_result_ref.artifact_digest
+        ):
+            raise TransitionError("scanner result reference is not verified")
+        recorded_scan = ScannerResult.model_validate_json(
+            self.artifact_store.get_verified(scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision)
+        )
+        if recorded_scan.request_id != scanner_result_ref.artifact_id or (
+            recorded_scan.candidate_ref != current_ref or recorded_scan.outcome is not ScannerOutcome.BLOCKED
+        ):
+            raise TransitionError("scanner findings are not bound to this draft")
+        observed_defects = {
+            step.target_ref.rsplit(":action:", 1)[1]
+            for step in recorded_scan.trace_steps
+            if step.check_id == "dependency_readiness"
+            and step.criterion_result is CriterionResult.NOT_SATISFIED
+            and step.evidence_refs
+            and step.target_ref.startswith(f"{current_ref.artifact_id}@{current_ref.artifact_revision}:action:")
+        }
+        if not set(authorized_action_ids).issubset(observed_defects):
+            raise TransitionError("repair scope is not backed by observed dependency defects")
+        try:
+            proposed_record = PlanningRecord.model_validate(proposed_record.model_dump(mode="json"))
+        except Exception as exc:
+            raise TransitionError("proposed draft plan fails contract validation") from exc
+        if proposed_record.task_id != task_id or proposed_record.run_id != run_id:
+            raise TransitionError("proposed draft task/run mismatch")
+        if proposed_record.stage_revision != original.stage_revision + 1 or (
+            proposed_record.candidate.specification_revision != original.candidate.specification_revision + 1
+        ):
+            raise TransitionError("draft and specification revisions must advance exactly once")
+
+        before = original.model_dump(mode="json")
+        after = proposed_record.model_dump(mode="json")
+        before_actions = before["candidate"]["build_spec"]["actions"]
+        after_actions = after["candidate"]["build_spec"]["actions"]
+        if len(before_actions) != len(after_actions):
+            raise TransitionError("draft action list changed")
+        changed_actions: set[str] = set()
+        for original_action, proposed_action in zip(before_actions, after_actions, strict=True):
+            action_id = original_action["action_id"]
+            if original_action["depends_on"] != proposed_action["depends_on"]:
+                if action_id not in authorized_action_ids:
+                    raise TransitionError("unauthorized dependency change")
+                changed_actions.add(action_id)
+                original_action["depends_on"] = proposed_action["depends_on"]
+        if not changed_actions:
+            raise TransitionError("repair proposal contains no authorized changes")
+        action_ids = {item["action_id"] for item in before_actions}
+        for original_action, proposed_action in zip(
+            original.candidate.build_spec.actions, proposed_record.candidate.build_spec.actions, strict=True
+        ):
+            if original_action.action_id not in changed_actions:
+                continue
+            existing_valid = set(original_action.depends_on) & action_ids
+            if not existing_valid.issubset(set(proposed_action.depends_on)):
+                raise TransitionError("repair removes an existing valid dependency")
+        if validate_action_graph(proposed_record.candidate.build_spec):
+            raise TransitionError("repair introduces an invalid dependency graph")
+        before["stage_revision"] = after["stage_revision"]
+        before["candidate"]["specification_revision"] = after["candidate"]["specification_revision"]
+        if before != after:
+            raise TransitionError("repair changed source, requirements, approvals, or unrelated fields")
+        self._publish_scanner_event(
+            task_id,
+            run_id,
+            recorded_scan.request_id,
+            "scanner_repair_started",
+            {"message": "Authorized dependency repair started", "candidate_id": current_ref.artifact_id},
+        )
+        try:
+            revision, digest = self.artifact_store.put_cas(
+                proposed_record,
+                current_ref.artifact_id,
+                expected_revision=current_ref.artifact_revision,
+                contract_id=current_ref.contract_id,
+                contract_version=current_ref.contract_version,
+            )
+        except Exception:
+            self._publish_scanner_event(
+                task_id,
+                run_id,
+                recorded_scan.request_id,
+                "scanner_repair_interrupted",
+                {"message": "Dependency repair did not persist"},
+            )
+            raise
+        updated_ref = current_ref.model_copy(update={"artifact_revision": revision, "artifact_digest": digest})
+        self.event_store.append(task_id, "draft_plan_repaired", updated_ref.artifact_id)
+        self._publish_scanner_event(
+            task_id,
+            run_id,
+            recorded_scan.request_id,
+            "scanner_repair_completed",
+            {
+                "message": "Authorized dependency repair recorded",
+                "candidate_id": updated_ref.artifact_id,
+                "candidate_revision": revision,
+                "candidate_digest": digest,
+            },
+        )
+        return updated_ref
 
     def run_structural_gap_analysis(
         self,
