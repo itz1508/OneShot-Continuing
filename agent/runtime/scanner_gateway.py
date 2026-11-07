@@ -237,13 +237,15 @@ class ScannerGateway:
                     evidence = f"artifact:{target}#{candidate_ref.artifact_digest}"
                     if traced_detector is scan_action_dependencies:
                         # Preserve the actual detector; stream predicate observations as executed.
+                        def publish_dependency_step(
+                            step: ScannerTraceStep,
+                            finding: ScannerFinding | None,
+                            capability: str = cap,
+                        ) -> None:
+                            report(capability, (step,), (), (finding,) if finding is not None else ())
+
                         result = scan_action_dependencies(
-                            artifact_bytes,
-                            target,
-                            evidence,
-                            on_step=lambda step, finding, capability=cap: report(
-                                capability, (step,), (), (finding,) if finding is not None else ()
-                            ),
+                            artifact_bytes, target, evidence, on_step=publish_dependency_step
                         )
                         report(cap, (), result.evidence_requests, ())
                     else:
