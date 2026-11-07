@@ -183,9 +183,14 @@ class ScannerGateway:
                 else:
                     assert detector is not None
                     findings = detector(artifact_bytes)
-            except Exception as exc:
+            except Exception:
                 not_checked.append(cap)
-                reasons.append(f"detector error for {cap}: {exc}")
+                reason = f"detector unavailable or malformed evidence for {cap}"
+                reasons.append(reason)
+                if traced_detector is not None:
+                    unresolved = self._unknown(candidate_ref, (cap,), reason)
+                    traces.extend(unresolved.trace_steps)
+                    evidence_requests.extend(unresolved.evidence_requests)
                 continue
             checked.append(cap)
             all_findings.extend(findings)
