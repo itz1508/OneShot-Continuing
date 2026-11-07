@@ -37,18 +37,18 @@ def modify(
     aid: str = "A1",
     path: str = "app/main.py",
     *,
-    requirement: str = "REQ-1",
+    requirement: str = "REQ-001",
     depends: tuple[str, ...] = (),
     digest: str | None = None,
 ) -> ModifyAction:
     return ModifyAction(
         action_id=aid,
         requirement_ids=(requirement,),
-        acceptance_criteria_ids=("C1",),
+        acceptance_criteria_ids=("AC-001",),
         code_intent_ids=("intent-1",),
         preconditions=("source snapshot recorded",),
         depends_on=depends,
-        validation_steps=("run acceptance check C1",),
+        validation_steps=("run acceptance check AC-001",),
         expected_result="confirmed expected behavior",
         recovery_requirement="restore source snapshot",
         source_path=path,
@@ -77,7 +77,7 @@ def scan(
     *,
     files: dict[str, str] | None = None,
     allowed: tuple[str, ...] = ALLOWED,
-    accepted: tuple[str, ...] = ("REQ-1",),
+    accepted: tuple[str, ...] = ("REQ-001",),
     criteria: dict[str, tuple[str, ...]] | None = None,
     complete: bool = True,
 ):
@@ -115,23 +115,23 @@ def test_existing_satisfied_requirement_needs_no_redundant_action():
         modify(),
         coverage=(
             RequirementCoverage(
-                requirement_id="REQ-2",
+                requirement_id="REQ-002",
                 status="covered",
-                criterion_refs=("C2",),
+                criterion_refs=("AC-002",),
                 specification_refs=("app/existing.py",),
                 reason="verified in pinned source",
             ),
         ),
     )
     defective = candidate(modify())
-    assert scan(sufficient, accepted=("REQ-1", "REQ-2")) == ()
-    assert categories(scan(defective, accepted=("REQ-1", "REQ-2"))) == {"missing_requirement_coverage"}
+    assert scan(sufficient, accepted=("REQ-001", "REQ-002")) == ()
+    assert categories(scan(defective, accepted=("REQ-001", "REQ-002"))) == {"missing_requirement_coverage"}
 
 
 def test_missing_accepted_criterion_and_planned_check():
     sufficient = candidate(modify())
-    assert scan(sufficient, criteria={"REQ-1": ("C1",)}) == ()
-    assert categories(scan(sufficient, criteria={"REQ-1": ("C2",)})) == {"missing_acceptance_check"}
+    assert scan(sufficient, criteria={"REQ-001": ("AC-001",)}) == ()
+    assert categories(scan(sufficient, criteria={"REQ-001": ("AC-002",)})) == {"missing_acceptance_check"}
 
 
 def test_out_of_scope_action_is_not_a_naming_issue():
@@ -146,11 +146,11 @@ def test_out_of_scope_action_is_not_a_naming_issue():
 def test_remove_and_modify_same_source_conflicts():
     remove = RemoveAction(
         action_id="A2",
-        requirement_ids=("REQ-1",),
-        acceptance_criteria_ids=("C1",),
+        requirement_ids=("REQ-001",),
+        acceptance_criteria_ids=("AC-001",),
         code_intent_ids=("intent-1",),
         preconditions=("source snapshot recorded",),
-        validation_steps=("run acceptance check C1",),
+        validation_steps=("run acceptance check AC-001",),
         expected_result="remove obsolete path",
         recovery_requirement="restore snapshot",
         source_path="app/main.py",
@@ -264,7 +264,7 @@ def test_existing_gateway_uses_immutable_artifact_and_registered_detector(tmp_pa
         plan_structure_detector(
             FILES,
             source_id="fixture:pinned-source",
-            accepted_requirements=("REQ-1",),
+            accepted_requirements=("REQ-001",),
             allowed_paths=ALLOWED,
             source_snapshot_complete=True,
         ),
