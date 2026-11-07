@@ -37,7 +37,7 @@ Thumbs.db
 
 # Local MVP runtime and frontend dependencies
 .oneshot-state/
-web/node_modules/
+node_modules/
 web/dist/
 web/playwright-report/
 web/test-results/
