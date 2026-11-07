@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from hashlib import sha256
 from typing import Literal
 
 from pydantic import Field
 
 from agent.contracts.planning import (
+    BuildAction,
     BuildSpecification,
     CandidateSpecification,
     PlanningRecord,
@@ -196,7 +197,7 @@ def scan_plan_draft(
     for msg in validate_spec_coverage(candidate.build_spec):
         add("missing_acceptance_check", "blocking", "plan.coverage", msg)
 
-    by_path: dict[str, list[object]] = {}
+    by_path: dict[str, list[BuildAction]] = {}
     for action in actions:
         path = getattr(action, "source_path", None) or getattr(action, "target_path", None)
         if not isinstance(path, str):
@@ -228,7 +229,7 @@ def scan_plan_draft(
                     requirement=str(action.requirement_ids[0]),
                     owner="Planning" if source_snapshot_complete else "Audit Discovery",
                 )
-            elif sha256(content.encode("utf-8")).hexdigest() != action.expected_source_digest:
+            elif sha256(content.encode("utf-8")).hexdigest() != getattr(action, "expected_source_digest", None):
                 add(
                     "source_drift", "blocking", f"plan.actions.{action.action_id}",
                     f"source digest mismatch: {path}", requirement=str(action.requirement_ids[0]),
@@ -343,3 +344,27 @@ def repair_plan_draft(
     if validate_action_graph(result.build_spec):
         raise ValueError("repair leaves an invalid dependency graph")
     return result
+
+def plan_structure_detector(
+    source_files: Mapping[str, str],
+    *,
+    source_id: str,
+    accepted_requirements: tuple[str, ...],
+    allowed_paths: tuple[str, ...],
+    required_criteria: Mapping[str, tuple[str, ...]] | None = None,
+    source_snapshot_complete: bool = False,
+) -> Callable[[bytes], tuple[ScannerFinding, ...]]:
+    """Adapt the existing ScannerGateway detector API without another runtime."""
+    def detect(candidate_bytes: bytes) -> tuple[ScannerFinding, ...]:
+        candidate = CandidateSpecification.model_validate_json(candidate_bytes)
+        return scan_plan_draft(
+            candidate,
+            source_files,
+            source_id=source_id,
+            accepted_requirements=accepted_requirements,
+            allowed_paths=allowed_paths,
+            required_criteria=required_criteria,
+            source_snapshot_complete=source_snapshot_complete,
+        )
+
+    return detect
