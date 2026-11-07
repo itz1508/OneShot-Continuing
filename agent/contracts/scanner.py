@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -24,6 +25,7 @@ class ScannerCapabilityID(StrEnum):
     SECURITY = "security"
     PATHS = "paths"
     COVERAGE = "coverage"
+    DEPENDENCY_READINESS = "dependency_readiness"
 
 
 class ScannerRequest(ContractModel):
@@ -69,9 +71,9 @@ class ScannerTraceStep(ContractModel):
     target_ref: str = Field(min_length=1)
     observation_state: ObservationState
     observed_value: bool | int | float | str | None
-    operator: str = Field(min_length=1)
+    operator: Literal["equals"] = "equals"
     expected_value: bool | int | float | str | None
-    threshold: float | None = None
+    threshold: float | None = Field(default=None, exclude_if=lambda value: value is None)
     criterion_result: CriterionResult
     criterion_validity: CriterionValidity
     required: bool = True
@@ -85,6 +87,10 @@ class ScannerTraceStep(ContractModel):
                 raise ValueError("unknown observations must have null values and unknown results")
         elif self.criterion_result is CriterionResult.UNKNOWN or self.observed_value is None:
             raise ValueError("known observations require a value and a comparison result")
+        elif (self.criterion_result is CriterionResult.SATISFIED) != (
+            type(self.observed_value) is type(self.expected_value) and self.observed_value == self.expected_value
+        ):
+            raise ValueError("criterion result must match executed equality comparison")
         if self.criterion_validity is CriterionValidity.VALID and (
             self.criterion_result is not CriterionResult.SATISFIED or not self.evidence_refs
         ):
