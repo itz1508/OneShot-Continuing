@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import os
 import sys
-from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 
 _attempted = False
 _enabled = False
@@ -54,7 +54,5 @@ def scanner_span(task_id: str, run_id: str, artifact_id: str) -> Iterator[None]:
     try:
         yield
     finally:
-        try:
+        with suppress(Exception):
             span.__exit__(*sys.exc_info())
-        except Exception:
-            pass
