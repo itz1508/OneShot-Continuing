@@ -22,7 +22,7 @@ jobs:
       - name: Dependency check
         run: uv run --no-sync deptry .
       - name: Lint
-        run: uv run --no-sync ruff check .
+        run: uv run --no-sync ruff check --diff .
       - name: Format check
         run: uv run --no-sync ruff format --check .
       - name: Type check
