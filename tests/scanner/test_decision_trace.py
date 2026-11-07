@@ -287,15 +287,11 @@ def test_repair_rejects_dependency_cycle(tmp_path, monkeypatch):
     candidate = proposed.candidate.model_copy(update={"build_spec": spec})
     proposed = proposed.model_copy(update={"candidate": candidate})
     with pytest.raises(TransitionError, match="invalid dependency graph"):
-        controller.repair_planning_draft(
-            "task-001", "run-001", before_ref, scan_ref, proposed, ("consumer",)
-        )
+        controller.repair_planning_draft("task-001", "run-001", before_ref, scan_ref, proposed, ("consumer",))
     assert controller.artifact_store.latest_revision("draft") == 1
 
 
-def test_unavailable_telemetry_exporter_does_not_block_persistence_or_expose_payload(
-    tmp_path, monkeypatch
-):
+def test_unavailable_telemetry_exporter_does_not_block_persistence_or_expose_payload(tmp_path, monkeypatch):
     import sys
     from types import SimpleNamespace
 
@@ -318,9 +314,7 @@ def test_unavailable_telemetry_exporter_does_not_block_persistence_or_expose_pay
     monkeypatch.setattr(telemetry, "_enabled", True)
     controller, _, _, scan_ref = make_scanned_controller(tmp_path, monkeypatch)
     assert controller.artifact_store.get_verified(scan_ref.artifact_id, 1)
-    assert captured == [
-        ("scanner.run", {"task_id": "task-001", "run_id": "run-001", "artifact_id": "draft"})
-    ]
+    assert captured == [("scanner.run", {"task_id": "task-001", "run_id": "run-001", "artifact_id": "draft"})]
 
 
 def test_gap_receipt_remains_mandatory(tmp_path):
