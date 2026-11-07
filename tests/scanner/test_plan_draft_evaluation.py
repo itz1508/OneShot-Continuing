@@ -14,7 +14,6 @@ from agent.contracts.common import ArtifactRef
 from agent.contracts.planning import (
     BuildSpecification,
     CandidateSpecification,
-    CriterionCoverage,
     ModifyAction,
     RemoveAction,
     RequirementCoverage,
@@ -58,7 +57,10 @@ def modify(
     )
 
 
-def candidate(*actions: ModifyAction | RemoveAction, coverage: tuple[RequirementCoverage, ...] = ()) -> CandidateSpecification:
+def candidate(
+    *actions: ModifyAction | RemoveAction,
+    coverage: tuple[RequirementCoverage, ...] = (),
+) -> CandidateSpecification:
     return CandidateSpecification(
         candidate_id="fixture-candidate",
         specification_revision=1,
