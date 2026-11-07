@@ -25,6 +25,10 @@ from agent.contracts.validation.planning import scan_plan_draft
 DATA = Path(__file__).resolve().parents[1] / "fixtures" / "plan_scanner"
 
 
+class UnrepresentableFixture(Exception):
+    """Only known schema incompatibilities are excluded from scoring."""
+
+
 def load(name: str, key: str) -> dict[str, Any]:
     return json.loads((DATA / name).read_text(encoding="utf-8"))[key]
 
@@ -35,14 +39,14 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
     action_rows = plan["file_actions"]
     checks = plan["acceptance_checks"]
     if not action_rows:
-        raise ValueError("unrepresentable: BuildSpecification requires at least one action")
+        raise UnrepresentableFixture("unrepresentable: BuildSpecification requires at least one action")
     if not checks:
-        raise ValueError("unrepresentable: native ActionBase requires recorded validation steps")
+        raise UnrepresentableFixture("unrepresentable: native ActionBase requires recorded validation steps")
     snapshots = item["source_snapshot"]
     sources = {path: value["content"] for path, value in snapshots.items()}
     for path, value in snapshots.items():
         if sha256(value["content"].encode("utf-8")).hexdigest() != value["sha256"]:
-            raise ValueError(f"unrepresentable: source digest mismatch at {path}")
+            raise UnrepresentableFixture(f"unrepresentable: source digest mismatch at {path}")
 
     adapter_limits = [
         "synthetic fixture has no CodeIntent/preconditions/recovery receipts; non-authoritative placeholders used",
@@ -53,13 +57,13 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
         aid = row["action_id"]
         related_tasks = [task for task in plan["tasks"] if aid in task["action_refs"]]
         if not related_tasks:
-            raise ValueError(f"unrepresentable: action {aid} has no fixture task mapping")
+            raise UnrepresentableFixture(f"unrepresentable: action {aid} has no fixture task mapping")
         requirement_ids = tuple(sorted({rid for task in related_tasks for rid in task["requirement_refs"]}))
         if not requirement_ids:
-            raise ValueError(f"unrepresentable: action {aid} has no requirement mapping")
+            raise UnrepresentableFixture(f"unrepresentable: action {aid} has no requirement mapping")
         relevant_checks = [check for check in checks if check["requirement_ref"] in requirement_ids]
         if not relevant_checks:
-            raise ValueError(f"unrepresentable: action {aid} has no validation check")
+            raise UnrepresentableFixture(f"unrepresentable: action {aid} has no validation check")
         path = row["path"]
         digest = snapshots[path]["sha256"] if path in snapshots else sha256(b"").hexdigest()
         if path not in snapshots:
@@ -89,7 +93,7 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
                 )
             )
         else:
-            raise ValueError(f"unrepresentable: unmapped action operation {row['operation']}")
+            raise UnrepresentableFixture(f"unrepresentable: unmapped action operation {row['operation']}")
 
     assumptions = tuple(
         PlanAssumption(
@@ -177,7 +181,7 @@ def run() -> dict[str, Any]:
                 ),
                 "adapter_limits": adapter_limits,
             }
-        except ValueError as exc:
+        except UnrepresentableFixture as exc:
             observed[key] = {
                 "status": "unrepresentable",
                 "reason": str(exc),
