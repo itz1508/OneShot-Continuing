@@ -134,9 +134,12 @@ def test_existing_satisfied_requirement_needs_no_redundant_action():
 
 
 def test_missing_accepted_criterion_and_planned_check():
+    accepted = {"REQ-001": ("AC-001",)}
     sufficient = candidate(modify())
-    assert scan(sufficient, criteria={"REQ-001": ("AC-001",)}) == ()
-    assert categories(scan(sufficient, criteria={"REQ-001": ("AC-002",)})) == {"missing_acceptance_check"}
+    defective_action = modify().model_copy(update={"acceptance_criteria_ids": ("AC-002",)})
+    defective = candidate(defective_action)
+    assert scan(sufficient, criteria=accepted) == ()
+    assert categories(scan(defective, criteria=accepted)) == {"missing_acceptance_check"}
 
 
 def test_out_of_scope_action_is_not_a_naming_issue():
