@@ -154,9 +154,11 @@ def test_unused_threshold_is_absent_in_emitted_trace(tmp_path):
         "planning",
         "1.0",
     )
-    trace = ScannerGateway(store).scan_exact(
-        artifact_ref("draft", 1, digest), "repo", ("dependency_readiness",)
-    ).trace_steps[0]
+    trace = (
+        ScannerGateway(store)
+        .scan_exact(artifact_ref("draft", 1, digest), "repo", ("dependency_readiness",))
+        .trace_steps[0]
+    )
     assert "threshold" not in trace.model_dump(mode="json")
 
 
@@ -169,9 +171,7 @@ def test_malformed_candidate_emits_unknown_not_false(tmp_path):
         "planning",
         "1.0",
     )
-    result = ScannerGateway(store).scan_exact(
-        artifact_ref("malformed", 1, digest), "repo", ("dependency_readiness",)
-    )
+    result = ScannerGateway(store).scan_exact(artifact_ref("malformed", 1, digest), "repo", ("dependency_readiness",))
     assert result.outcome is ScannerOutcome.BLOCKED
     assert result.capabilities_not_checked == ("dependency_readiness",)
     assert result.trace_steps[0].criterion_result is CriterionResult.UNKNOWN

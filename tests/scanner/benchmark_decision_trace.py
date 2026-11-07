@@ -9,13 +9,14 @@ from __future__ import annotations
 import json
 from time import perf_counter_ns
 
+from test_decision_trace import make_planning_record, revised_record
+
 from agent.contracts.validation.planning import (
     parse_action_dependency_facts,
     scan_action_dependencies,
     validate_action_graph,
 )
 from agent.runtime.canonical_serialization import canonical_bytes
-from test_decision_trace import make_planning_record, revised_record
 
 
 def timed_scan(source: bytes, target: str):
@@ -57,27 +58,32 @@ def main() -> None:
     info = parse_action_dependency_facts.cache_info()
     assert info.currsize <= 128 and info.maxsize == 128
 
-    print(json.dumps({
-        "oracle_original": legacy_bad,
-        "oracle_repaired": legacy_good,
-        "new_original_findings": [item.message for item in cold.findings],
-        "new_repaired_findings": [item.message for item in changed.findings],
-        "oracle_equivalence": True,
-        "cold_total_ns": cold_total,
-        "warm_total_ns": warm_total,
-        "changed_total_ns": changed_total,
-        "cold_parse_ns": cold.parse_duration_ns,
-        "warm_parse_ns": warm.parse_duration_ns,
-        "changed_parse_ns": changed.parse_duration_ns,
-        "cold_hits": cold.cache_hits,
-        "cold_misses": cold.cache_misses,
-        "warm_hits": warm.cache_hits,
-        "warm_misses": warm.cache_misses,
-        "changed_misses": changed.cache_misses,
-        "parser_version_invalidation": True,
-        "cache_maxsize": info.maxsize,
-        "cache_currsize": info.currsize,
-    }, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "oracle_original": legacy_bad,
+                "oracle_repaired": legacy_good,
+                "new_original_findings": [item.message for item in cold.findings],
+                "new_repaired_findings": [item.message for item in changed.findings],
+                "oracle_equivalence": True,
+                "cold_total_ns": cold_total,
+                "warm_total_ns": warm_total,
+                "changed_total_ns": changed_total,
+                "cold_parse_ns": cold.parse_duration_ns,
+                "warm_parse_ns": warm.parse_duration_ns,
+                "changed_parse_ns": changed.parse_duration_ns,
+                "cold_hits": cold.cache_hits,
+                "cold_misses": cold.cache_misses,
+                "warm_hits": warm.cache_hits,
+                "warm_misses": warm.cache_misses,
+                "changed_misses": changed.cache_misses,
+                "parser_version_invalidation": True,
+                "cache_maxsize": info.maxsize,
+                "cache_currsize": info.currsize,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
