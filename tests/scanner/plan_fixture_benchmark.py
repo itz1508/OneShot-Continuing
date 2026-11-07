@@ -54,9 +54,7 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
         related_tasks = [task for task in plan["tasks"] if aid in task["action_refs"]]
         if not related_tasks:
             raise ValueError(f"unrepresentable: action {aid} has no fixture task mapping")
-        requirement_ids = tuple(
-            sorted({rid for task in related_tasks for rid in task["requirement_refs"]})
-        )
+        requirement_ids = tuple(sorted({rid for task in related_tasks for rid in task["requirement_refs"]}))
         if not requirement_ids:
             raise ValueError(f"unrepresentable: action {aid} has no requirement mapping")
         relevant_checks = [check for check in checks if check["requirement_ref"] in requirement_ids]
@@ -225,9 +223,7 @@ def run() -> dict[str, Any]:
             "unrepresentable inputs excluded from denominators and reported individually",
             "no host-verified receipts; no source completeness guarantee",
         ],
-        "summary": {
-            split: score(records, split) for split in ("development", "held_out")
-        }
+        "summary": {split: score(records, split) for split in ("development", "held_out")}
         | {"all": score_all(records)},
         "records": records,
     }
