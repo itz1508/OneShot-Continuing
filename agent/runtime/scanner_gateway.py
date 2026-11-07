@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 from agent.contracts.common import ArtifactRef
 from agent.contracts.scanner import (
-    CriterionValidity,
     CriterionResult,
+    CriterionValidity,
     ObservationState,
     ScannerEvidenceRequest,
     ScannerFinding,
@@ -194,7 +194,8 @@ class ScannerGateway:
             request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
             outcome=(
                 ScannerOutcome.PASS
-                if not not_checked and not all_findings
+                if not not_checked
+                and not all_findings
                 and all(t.criterion_validity is CriterionValidity.VALID for t in traces)
                 else ScannerOutcome.BLOCKED
             ),

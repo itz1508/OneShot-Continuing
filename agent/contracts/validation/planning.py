@@ -6,6 +6,10 @@ import json
 from functools import lru_cache
 from time import perf_counter_ns
 
+from agent.contracts.planning import (
+    BuildSpecification,
+    PlanningRecord,
+)
 from agent.contracts.scanner import (
     CriterionResult,
     CriterionValidity,
@@ -13,11 +17,6 @@ from agent.contracts.scanner import (
     ScannerFinding,
     ScannerTraceStep,
     TracedDetectorResult,
-)
-
-from agent.contracts.planning import (
-    BuildSpecification,
-    PlanningRecord,
 )
 
 
@@ -137,9 +136,7 @@ MAX_CACHED_SOURCE_BYTES = 262_144
 
 
 @lru_cache(maxsize=128)
-def parse_action_dependency_facts(
-    parser_version: str, source_bytes: bytes
-) -> tuple[tuple[str, tuple[str, ...]], ...]:
+def parse_action_dependency_facts(parser_version: str, source_bytes: bytes) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Extract immutable action/dependency facts from exact candidate bytes."""
     if not parser_version:
         raise ValueError("parser version required")

@@ -63,7 +63,9 @@ def test_matched_true_false_and_unknown_observations(tmp_path):
     assert all(step.criterion_result is CriterionResult.SATISFIED for step in good.trace_steps)
     assert all(step.criterion_validity is CriterionValidity.VALID for step in good.trace_steps)
     assert all(step.observation_state is ObservationState.KNOWN for step in good.trace_steps)
-    assert all(step.evidence_refs and step.operator == "equals" and step.expected_value is True for step in good.trace_steps)
+    assert all(
+        step.evidence_refs and step.operator == "equals" and step.expected_value is True for step in good.trace_steps
+    )
 
     bad_payload = payload.model_copy(deep=True)
     bad_payload.actions[1]["depends_on"] = ["absent"]  # one controlled difference
@@ -75,9 +77,7 @@ def test_matched_true_false_and_unknown_observations(tmp_path):
     assert bad.trace_steps[-1].criterion_result is CriterionResult.NOT_SATISFIED
     assert bad.trace_steps[-1].criterion_validity is CriterionValidity.NOT_VALID
 
-    missing = gateway.scan_exact(
-        artifact_ref("missing", 1, "a" * 64), "repo", ("dependency_readiness",)
-    )
+    missing = gateway.scan_exact(artifact_ref("missing", 1, "a" * 64), "repo", ("dependency_readiness",))
     assert missing.outcome is ScannerOutcome.BLOCKED
     assert len(missing.evidence_requests) == 1
     assert missing.trace_steps[0].observed_value is None
@@ -140,9 +140,7 @@ def make_planning_record() -> PlanningRecord:
         "target_conflict_check_ref": "fixture-ref",
     }
     producer = CreateAction(action_id="producer", target_path="producer.py", **action_base)
-    consumer = CreateAction(
-        action_id="consumer", target_path="consumer.py", depends_on=("absent",), **action_base
-    )
+    consumer = CreateAction(action_id="consumer", target_path="consumer.py", depends_on=("absent",), **action_base)
     return PlanningRecord(
         task_id="task-001",
         run_id="run-001",
@@ -164,9 +162,7 @@ def revised_record(original: PlanningRecord) -> PlanningRecord:
     producer, consumer = original.candidate.build_spec.actions
     fixed = consumer.model_copy(update={"depends_on": ("producer",)})
     specification = original.candidate.build_spec.model_copy(update={"actions": (producer, fixed)})
-    candidate = original.candidate.model_copy(
-        update={"specification_revision": 2, "build_spec": specification}
-    )
+    candidate = original.candidate.model_copy(update={"specification_revision": 2, "build_spec": specification})
     return original.model_copy(update={"stage_revision": 2, "candidate": candidate})
 
 
@@ -184,9 +180,7 @@ def make_scanned_controller(tmp_path, monkeypatch):
     scan_digest = controller.artifact_store.get_digest(scan.request_id, 1)
     assert scan_digest is not None
     scanned_ref = artifact_ref(scan.request_id, 1, scan_digest, "scanner_result")
-    persisted = ScannerResult.model_validate_json(
-        controller.artifact_store.get_verified(scan.request_id, 1)
-    )
+    persisted = ScannerResult.model_validate_json(controller.artifact_store.get_verified(scan.request_id, 1))
     assert persisted.trace_steps == scan.trace_steps
     return controller, record, current_ref, scanned_ref
 
@@ -195,25 +189,20 @@ def test_runtime_repair_cas_diff_guard_and_rescan(tmp_path, monkeypatch):
     controller, original, before_ref, scan_ref = make_scanned_controller(tmp_path, monkeypatch)
     updated = revised_record(original)
     with pytest.raises(AuthorizationError):
-        controller.repair_planning_draft(
-            "task-001", "run-001", before_ref, scan_ref, updated, ("consumer",)
-        )
+        controller.repair_planning_draft("task-001", "run-001", before_ref, scan_ref, updated, ("consumer",))
     controller.authorization.grant("planner", Capability.WRITE, "draft-plan:task-001")
-    new_ref = controller.repair_planning_draft(
-        "task-001", "run-001", before_ref, scan_ref, updated, ("consumer",)
-    )
+    new_ref = controller.repair_planning_draft("task-001", "run-001", before_ref, scan_ref, updated, ("consumer",))
     assert new_ref.artifact_revision == 2
     assert controller.artifact_store.get_verified(before_ref.artifact_id, 1)
-    assert PlanningRecord.model_validate_json(
-        controller.artifact_store.get_verified(before_ref.artifact_id, 1)
-    ) == original
+    assert (
+        PlanningRecord.model_validate_json(controller.artifact_store.get_verified(before_ref.artifact_id, 1))
+        == original
+    )
     rescanned = controller.scanner.scan_exact(new_ref, "repo", ("dependency_readiness",))
     assert rescanned.outcome is ScannerOutcome.PASS
     assert all(step.criterion_validity is CriterionValidity.VALID for step in rescanned.trace_steps)
     with pytest.raises(TransitionError, match="stale"):
-        controller.repair_planning_draft(
-            "task-001", "run-001", before_ref, scan_ref, updated, ("consumer",)
-        )
+        controller.repair_planning_draft("task-001", "run-001", before_ref, scan_ref, updated, ("consumer",))
 
 
 @pytest.mark.parametrize("changed_field", ["target_path", "preconditions", "audit_ref"])
@@ -222,9 +211,7 @@ def test_repair_rejects_unrelated_nested_or_source_edits(tmp_path, monkeypatch, 
     controller.authorization.grant("planner", Capability.WRITE, "draft-plan:task-001")
     updated = revised_record(original)
     if changed_field == "audit_ref":
-        updated = updated.model_copy(
-            update={"audit_ref": artifact_ref("different", 1, "c" * 64, "audit")}
-        )
+        updated = updated.model_copy(update={"audit_ref": artifact_ref("different", 1, "c" * 64, "audit")})
     else:
         actions = list(updated.candidate.build_spec.actions)
         actions[1] = actions[1].model_copy(
@@ -234,9 +221,7 @@ def test_repair_rejects_unrelated_nested_or_source_edits(tmp_path, monkeypatch, 
         cand = updated.candidate.model_copy(update={"build_spec": spec})
         updated = updated.model_copy(update={"candidate": cand})
     with pytest.raises(TransitionError, match="unrelated"):
-        controller.repair_planning_draft(
-            "task-001", "run-001", before_ref, scan_ref, updated, ("consumer",)
-        )
+        controller.repair_planning_draft("task-001", "run-001", before_ref, scan_ref, updated, ("consumer",))
     assert controller.artifact_store.latest_revision("draft") == 1
 
 

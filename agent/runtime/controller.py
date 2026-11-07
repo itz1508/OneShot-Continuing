@@ -323,15 +323,12 @@ class HostController:
             raise TransitionError("frozen or finalized plans cannot be repaired")
 
         if scanner_result_ref.contract_id != "scanner_result" or (
-            self.artifact_store.get_digest(
-                scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision
-            ) != scanner_result_ref.artifact_digest
+            self.artifact_store.get_digest(scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision)
+            != scanner_result_ref.artifact_digest
         ):
             raise TransitionError("scanner result reference is not verified")
         recorded_scan = ScannerResult.model_validate_json(
-            self.artifact_store.get_verified(
-                scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision
-            )
+            self.artifact_store.get_verified(scanner_result_ref.artifact_id, scanner_result_ref.artifact_revision)
         )
         if recorded_scan.request_id != scanner_result_ref.artifact_id or (
             recorded_scan.candidate_ref != current_ref or recorded_scan.outcome is not ScannerOutcome.BLOCKED

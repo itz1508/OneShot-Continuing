@@ -44,7 +44,6 @@ class ScannerFinding(ContractModel):
     evidence_ref: str = ""
 
 
-
 class ObservationState(StrEnum):
     KNOWN = "known"
     UNKNOWN = "unknown"

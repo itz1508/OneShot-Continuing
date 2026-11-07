@@ -54,6 +54,7 @@ allowed_origin_regex = os.environ.get(
     r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|https://.*\.modal\.run)$",
 )
 
+
 @asynccontextmanager
 async def scanner_telemetry_lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logfire()
