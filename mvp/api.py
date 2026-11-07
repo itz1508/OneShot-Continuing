@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from agent.runtime.providers.base import ProviderError
+from agent.runtime.scanner_telemetry import configure_logfire
 from mvp.connector_store import (
     ConnectorError,
     MCPAuthType,
@@ -53,6 +54,7 @@ allowed_origin_regex = os.environ.get(
 )
 
 app = FastAPI(title="OneShot MVP API", version="0.1.0")
+app.add_event_handler("startup", configure_logfire)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 app.add_middleware(
     CORSMiddleware,
