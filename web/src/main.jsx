@@ -58,7 +58,7 @@ const eventSide = (type) => {
   const normalized = String(type || '').toLowerCase()
   if (normalized.includes('input')) return 'right'
   if (normalized.includes('error') || normalized.includes('blocked') || normalized.includes('conflict')) return 'left warn'
-  if (normalized.includes('audit') || normalized.includes('research') || normalized.includes('stream')) return 'left host'
+  if (normalized.includes('audit') || normalized.includes('research') || normalized.includes('stream') || normalized.includes('scanner')) return 'left host'
   return 'left'
 }
 const readStoredValue = (key) => {
@@ -101,6 +101,9 @@ function App() {
   const [draftModelId, setDraftModelId] = useState(() => readStoredValue('oneshot-model-id'))
   const [draftModelApiKey, setDraftModelApiKey] = useState('')
   const [streamState, setStreamState] = useState('idle')
+  const [scannerRequest, setScannerRequest] = useState('')
+  const [scannerOperatorToken, setScannerOperatorToken] = useState('')
+  const [scannerResult, setScannerResult] = useState(null)
   const [pinnedToBottom, setPinnedToBottom] = useState(true)
   const streamRef = useRef(null)
   const transcriptRef = useRef(null)
@@ -325,6 +328,11 @@ function App() {
   }, [])
 
   useEffect(() => {
+    setScannerRequest('')
+    setScannerResult(null)
+  }, [taskId])
+
+  useEffect(() => {
     streamRef.current?.close()
     if (!taskId) {
       setStreamState('idle')
@@ -511,6 +519,29 @@ function App() {
     } catch (exc) {
       await fetchDetails(task.task_id).catch(() => {})
       setError(exc.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function runScanner() {
+    if (!task || loading || task.current_stage !== 'planning' || !scannerRequest.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const payload = JSON.parse(scannerRequest)
+      const result = await apiFetch('/api/tasks/' + task.task_id + '/scanner', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(scannerOperatorToken ? { 'X-Operator-Token': scannerOperatorToken } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
+      setScannerResult(result)
+      await fetchDetails(task.task_id)
+    } catch (exc) {
+      setError(exc instanceof SyntaxError ? 'Scanner request must be valid JSON with host-issued references.' : exc.message)
     } finally {
       setLoading(false)
     }
@@ -714,6 +745,42 @@ function App() {
               </button>
               <div className="action-help">{canRun ? 'This calls the real supported API action.' : task ? 'The host determines when this action is available.' : 'No task to execute yet.'}</div>
             </div>
+
+            <details className="scanner-tool">
+              <summary>Scanner · Planning</summary>
+              <p>Invoke the existing host Scanner using the exact Planning candidate and structural-gap result/receipt. Unverified or stale inputs are rejected.</p>
+              <label htmlFor="scanner-request">Scanner request JSON</label>
+              <textarea
+                id="scanner-request"
+                aria-label="Scanner request JSON"
+                rows={7}
+                spellCheck={false}
+                placeholder={'{"run_id":"…","candidate_ref":{…},"repository_identity":"…","capabilities":["dependency_readiness"],"gap_result_ref":{…},"gap_receipt_ref":{…}}'}
+                value={scannerRequest}
+                onChange={(event) => setScannerRequest(event.target.value)}
+              />
+              <label htmlFor="scanner-operator-token">Operator token (when configured)</label>
+              <input
+                id="scanner-operator-token"
+                aria-label="Scanner operator token"
+                type="password"
+                autoComplete="off"
+                value={scannerOperatorToken}
+                onChange={(event) => setScannerOperatorToken(event.target.value)}
+              />
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={runScanner}
+                disabled={!task || task.current_stage !== 'planning' || !scannerRequest.trim() || loading}
+              >
+                {loading ? 'Scanning…' : 'Run host Scanner'}
+              </button>
+              {task?.current_stage !== 'planning' ? <p>Scanner requires the active Planning stage.</p> : null}
+              {scannerResult ? (
+                <p role="status">Recorded {scannerResult.outcome} · {scannerResult.request_id} · {scannerResult.findings?.length || 0} findings</p>
+              ) : null}
+            </details>
 
             <div className="artifact-block" id="artifactPanel">
               <div className="artifact-head">
