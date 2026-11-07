@@ -7,10 +7,17 @@ from typing import TYPE_CHECKING
 
 from agent.contracts.common import ArtifactRef
 from agent.contracts.scanner import (
+    CriterionValidity,
+    CriterionResult,
+    ObservationState,
+    ScannerEvidenceRequest,
     ScannerFinding,
     ScannerOutcome,
     ScannerResult,
+    ScannerTraceStep,
+    TracedDetectorResult,
 )
+from agent.contracts.validation.planning import scan_action_dependencies
 
 if TYPE_CHECKING:
     from agent.runtime.artifact_store import ArtifactStore
@@ -18,6 +25,7 @@ if TYPE_CHECKING:
 
 # Type alias: a detector takes artifact bytes and returns findings (empty = pass)
 DetectorFn = Callable[[bytes], tuple[ScannerFinding, ...]]
+TracedDetectorFn = Callable[[bytes, str, str], TracedDetectorResult]
 
 
 class ScannerGatewayError(Exception):
@@ -35,7 +43,9 @@ class ScannerGateway:
     def __init__(self, artifact_store: ArtifactStore | None = None) -> None:
         self._registered_capabilities: set[str] = set()
         self._detectors: dict[str, DetectorFn] = {}
+        self._traced_detectors: dict[str, TracedDetectorFn] = {}
         self._artifact_store = artifact_store
+        self.register_traced_detector("dependency_readiness", scan_action_dependencies)
 
     def register_capability(self, capability_id: str) -> None:
         """Register a capability without a detector (capability will BLOCK at scan time)."""
@@ -50,6 +60,52 @@ class ScannerGateway:
         """
         self._registered_capabilities.add(capability_id)
         self._detectors[capability_id] = detector
+
+    def register_traced_detector(self, capability_id: str, detector: TracedDetectorFn) -> None:
+        """Register a detector with first-class, execution-time comparisons."""
+        self._registered_capabilities.add(capability_id)
+        self._traced_detectors[capability_id] = detector
+
+    @staticmethod
+    def _unknown(candidate_ref: ArtifactRef, capabilities: tuple[str, ...], reason: str) -> ScannerResult:
+        """Missing evidence is unknown, not known-false."""
+        target = f"{candidate_ref.artifact_id}@{candidate_ref.artifact_revision}"
+        traces = tuple(
+            ScannerTraceStep(
+                check_id=cap,
+                rule_version="1",
+                scanner_version="1",
+                target_ref=target,
+                observation_state=ObservationState.UNKNOWN,
+                observed_value=None,
+                operator="equals",
+                expected_value=True,
+                criterion_result=CriterionResult.UNKNOWN,
+                criterion_validity=CriterionValidity.NOT_VALID,
+                reason=reason,
+            )
+            for cap in capabilities
+            if cap == "dependency_readiness"
+        )
+        requests = tuple(
+            ScannerEvidenceRequest(
+                check_id=cap,
+                target_ref=target,
+                missing_evidence="verified candidate artifact",
+                reason=reason,
+            )
+            for cap in capabilities
+            if cap == "dependency_readiness"
+        )
+        return ScannerResult(
+            request_id=f"scan-{target}",
+            outcome=ScannerOutcome.BLOCKED,
+            capabilities_not_checked=capabilities,
+            limitation_reasons=(reason,),
+            candidate_ref=candidate_ref,
+            trace_steps=traces,
+            evidence_requests=requests,
+        )
 
     def scan_exact(
         self,
@@ -83,92 +139,75 @@ class ScannerGateway:
                 findings=(),
             )
 
-        # Verify content integrity if artifact store is available
-        if self._artifact_store is not None:
-            stored_digest = self._artifact_store.get_digest(
-                candidate_ref.artifact_id,
-                candidate_ref.artifact_revision,
-            )
-            if stored_digest is None:
-                return ScannerResult(
-                    request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                    outcome=ScannerOutcome.BLOCKED,
-                    capabilities_checked=(),
-                    capabilities_not_checked=capabilities,
-                    limitation_reasons=("artifact not found in store",),
-                )
-            if stored_digest != candidate_ref.artifact_digest:
-                return ScannerResult(
-                    request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                    outcome=ScannerOutcome.BLOCKED,
-                    capabilities_checked=(),
-                    capabilities_not_checked=capabilities,
-                    limitation_reasons=("content digest mismatch",),
-                    findings=(
-                        ScannerFinding(
-                            finding_id=f"finding-{candidate_ref.artifact_id}",
-                            capability=capabilities[0] if capabilities else "unknown",
-                            severity="error",
-                            message=f"expected {candidate_ref.artifact_digest}, got {stored_digest}",
-                        ),
-                    ),
-                )
-        else:
-            # No artifact store — cannot verify content integrity
-            return ScannerResult(
-                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                outcome=ScannerOutcome.BLOCKED,
-                capabilities_checked=(),
-                capabilities_not_checked=capabilities,
-                limitation_reasons=("no artifact store configured for content verification",),
-            )
+        # Always verify current immutable storage before using cached source facts.
+        if self._artifact_store is None:
+            return self._unknown(candidate_ref, capabilities, "no artifact store configured for content verification")
+        stored_digest = self._artifact_store.get_digest(candidate_ref.artifact_id, candidate_ref.artifact_revision)
+        if stored_digest is None:
+            return self._unknown(candidate_ref, capabilities, "artifact not found in store")
+        if stored_digest != candidate_ref.artifact_digest:
+            return self._unknown(candidate_ref, capabilities, "content digest mismatch")
 
-        # Content verified — now invoke actual registered detectors
+        # Trace and authorization bindings are created fresh on each invocation.
         all_findings: list[ScannerFinding] = []
         checked: list[str] = []
         not_checked: list[str] = []
         reasons: list[str] = []
+        traces: list[ScannerTraceStep] = []
+        evidence_requests: list[ScannerEvidenceRequest] = []
+        cache_hits = 0
+        cache_misses = 0
+        parse_duration_ns = 0
 
         for cap in capabilities:
             detector = self._detectors.get(cap)
-            if detector is None:
-                # Capability is registered but has no detector — cannot verify
+            traced_detector = self._traced_detectors.get(cap)
+            if detector is None and traced_detector is None:
                 not_checked.append(cap)
                 reasons.append(f"no detector registered for capability: {cap}")
                 continue
-
-            # Retrieve artifact content for detector execution
-            artifact_bytes = self._artifact_store.get_verified(
-                candidate_ref.artifact_id,
-                candidate_ref.artifact_revision,
-            )
             try:
-                findings = detector(artifact_bytes)
+                artifact_bytes = self._artifact_store.get_verified(
+                    candidate_ref.artifact_id, candidate_ref.artifact_revision
+                )
+                if traced_detector is not None:
+                    target = f"{candidate_ref.artifact_id}@{candidate_ref.artifact_revision}"
+                    evidence = f"artifact:{target}#{candidate_ref.artifact_digest}"
+                    result = traced_detector(artifact_bytes, target, evidence)
+                    findings = result.findings
+                    traces.extend(result.trace_steps)
+                    evidence_requests.extend(result.evidence_requests)
+                    cache_hits += result.cache_hits
+                    cache_misses += result.cache_misses
+                    parse_duration_ns += result.parse_duration_ns
+                else:
+                    assert detector is not None
+                    findings = detector(artifact_bytes)
             except Exception as exc:
                 not_checked.append(cap)
                 reasons.append(f"detector error for {cap}: {exc}")
                 continue
-
             checked.append(cap)
             all_findings.extend(findings)
 
-        if not_checked:
-            return ScannerResult(
-                request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-                outcome=ScannerOutcome.BLOCKED,
-                capabilities_checked=tuple(checked),
-                capabilities_not_checked=tuple(not_checked),
-                limitation_reasons=tuple(reasons),
-                findings=tuple(all_findings),
-            )
-
-        # All detectors executed — PASS only if no findings
         return ScannerResult(
             request_id=f"scan-{candidate_ref.artifact_id}-{candidate_ref.artifact_revision}",
-            outcome=ScannerOutcome.PASS if not all_findings else ScannerOutcome.BLOCKED,
-            capabilities_checked=capabilities,
-            capabilities_not_checked=(),
+            outcome=(
+                ScannerOutcome.PASS
+                if not not_checked and not all_findings
+                and all(t.criterion_validity is CriterionValidity.VALID for t in traces)
+                else ScannerOutcome.BLOCKED
+            ),
+            capabilities_checked=tuple(checked),
+            capabilities_not_checked=tuple(not_checked),
+            limitation_reasons=tuple(reasons),
             findings=tuple(all_findings),
+            candidate_ref=candidate_ref,
+            trace_steps=tuple(traces),
+            evidence_requests=tuple(evidence_requests),
+            cache_hits=cache_hits,
+            cache_misses=cache_misses,
+            parse_duration_ns=parse_duration_ns,
         )
 
     @property
