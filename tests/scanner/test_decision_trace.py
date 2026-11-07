@@ -277,6 +277,52 @@ def test_repair_rejects_unrelated_nested_or_source_edits(tmp_path, monkeypatch, 
     assert controller.artifact_store.latest_revision("draft") == 1
 
 
+def test_repair_rejects_dependency_cycle(tmp_path, monkeypatch):
+    controller, original, before_ref, scan_ref = make_scanned_controller(tmp_path, monkeypatch)
+    controller.authorization.grant("planner", Capability.WRITE, "draft-plan:task-001")
+    proposed = revised_record(original)
+    actions = list(proposed.candidate.build_spec.actions)
+    actions[1] = actions[1].model_copy(update={"depends_on": ("producer", "consumer")})
+    spec = proposed.candidate.build_spec.model_copy(update={"actions": tuple(actions)})
+    candidate = proposed.candidate.model_copy(update={"build_spec": spec})
+    proposed = proposed.model_copy(update={"candidate": candidate})
+    with pytest.raises(TransitionError, match="invalid dependency graph"):
+        controller.repair_planning_draft(
+            "task-001", "run-001", before_ref, scan_ref, proposed, ("consumer",)
+        )
+    assert controller.artifact_store.latest_revision("draft") == 1
+
+
+def test_unavailable_telemetry_exporter_does_not_block_persistence_or_expose_payload(
+    tmp_path, monkeypatch
+):
+    import sys
+    from types import SimpleNamespace
+
+    import agent.runtime.scanner_telemetry as telemetry
+
+    captured = []
+
+    class FailingExporterSpan:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            raise OSError("simulated unavailable exporter")
+
+    def record_span(name, **attributes):
+        captured.append((name, attributes))
+        return FailingExporterSpan()
+
+    monkeypatch.setitem(sys.modules, "logfire", SimpleNamespace(span=record_span))
+    monkeypatch.setattr(telemetry, "_enabled", True)
+    controller, _, _, scan_ref = make_scanned_controller(tmp_path, monkeypatch)
+    assert controller.artifact_store.get_verified(scan_ref.artifact_id, 1)
+    assert captured == [
+        ("scanner.run", {"task_id": "task-001", "run_id": "run-001", "artifact_id": "draft"})
+    ]
+
+
 def test_gap_receipt_remains_mandatory(tmp_path):
     controller = HostController(tmp_path)
     with pytest.raises(TransitionError, match="structural gap"):
