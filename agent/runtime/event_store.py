@@ -58,8 +58,7 @@ class EventStore:
         conn = sqlite3.connect(str(self.db_path))
         try:
             query = (
-                "SELECT seq, event_type, event_data, created_at FROM events "
-                "WHERE task_id = ? AND seq > ? ORDER BY seq"
+                "SELECT seq, event_type, event_data, created_at FROM events WHERE task_id = ? AND seq > ? ORDER BY seq"
             )
             params: tuple[str | int, ...] = (task_id, after)
             if limit is not None:

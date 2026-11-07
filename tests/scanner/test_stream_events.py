@@ -174,7 +174,6 @@ def test_check_events_are_persisted_while_detector_is_still_executing(tmp_path, 
     assert host.event_store.list(record.task_id)[-1]["event_type"] == "scanner_completed"
 
 
-
 def test_graph_uniqueness_cycle_and_unknown_evidence_are_independent(tmp_path):
     from pydantic import BaseModel
 
@@ -193,13 +192,17 @@ def test_graph_uniqueness_cycle_and_unknown_evidence_are_independent(tmp_path):
     for label, graph, finding_id, check_id in cases:
         digest = gateway._artifact_store.put_immutable(
             Graph(actions=[{"action_id": action, "depends_on": list(deps)} for action, deps in graph]),
-            label, 1, "planning", "1.0",
+            label,
+            1,
+            "planning",
+            "1.0",
         )
         scan = gateway.scan_exact(artifact_ref(label, 1, digest), "repo", ("dependency_readiness",))
         assert scan.outcome is ScannerOutcome.BLOCKED
         assert finding_id in {finding.finding_id for finding in scan.findings}
         assert any(
-            step.check_id == check_id and step.criterion_result is CriterionResult.NOT_SATISFIED
+            step.check_id == check_id
+            and step.criterion_result is CriterionResult.NOT_SATISFIED
             and step.criterion_validity is CriterionValidity.NOT_VALID
             for step in scan.trace_steps
         )
@@ -216,7 +219,13 @@ def test_event_persistence_failure_blocks_scan_and_listener_failure_does_not(tmp
 
     # Optional output observers have no authority to change a verified scan.
     result = host.scan_planning_candidate(
-        record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None,
+        record.task_id,
+        record.run_id,
+        ref,
+        "repo",
+        ("dependency_readiness",),
+        None,
+        None,
         on_event=lambda event: (_ for _ in ()).throw(OSError("observer disconnected")),
     )
     assert host.artifact_store.get_verified(result.request_id, 1)
@@ -231,9 +240,7 @@ def test_event_persistence_failure_blocks_scan_and_listener_failure_does_not(tmp
 
     monkeypatch.setattr(host.event_store, "append", failure)
     with pytest.raises(ScannerGatewayError):
-        host.scan_planning_candidate(
-            record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None
-        )
+        host.scan_planning_candidate(record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None)
     events = host.event_store.list(record.task_id)
     assert events[-1]["event_type"] == "scanner_interrupted"
     assert not any(event["event_type"] == "scanner_completed" for event in events[-2:])

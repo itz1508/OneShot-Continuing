@@ -156,7 +156,6 @@ def test_cli_module_command_dispatches_the_same_host_scan(tmp_path, monkeypatch,
     assert service.events(task_id)[-1]["type"] == "scanner_completed"
 
 
-
 def test_real_host_structural_gap_receipt_allows_http_scanner_without_stub(tmp_path, monkeypatch):
     import mvp.api
     from tests.fixtures.structural_gap import build_gap_inputs
@@ -173,9 +172,7 @@ def test_real_host_structural_gap_receipt_allows_http_scanner_without_stub(tmp_p
     )
     monkeypatch.setattr(mvp.api, "service", service)
     monkeypatch.delenv("ONESHOT_OPERATOR_TOKEN", raising=False)
-    response = TestClient(mvp.api.app).post(
-        f"/api/tasks/{task_id}/scanner", json=exact.model_dump(mode="json")
-    )
+    response = TestClient(mvp.api.app).post(f"/api/tasks/{task_id}/scanner", json=exact.model_dump(mode="json"))
     assert response.status_code == 200
     scan = response.json()
     assert scan["outcome"] == "blocked"
