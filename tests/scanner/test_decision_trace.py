@@ -128,6 +128,58 @@ def test_bounded_cache_equivalence_invalidation_and_timings(capsys):
     assert "equivalent=true" in capsys.readouterr().out
 
 
+def test_invalid_equality_comparison_is_rejected():
+    with pytest.raises(ValueError, match="executed equality"):
+        ScannerTraceStep(
+            check_id="dependency_readiness",
+            rule_version="1",
+            scanner_version="1",
+            target_ref="draft@1",
+            observation_state=ObservationState.KNOWN,
+            observed_value=False,
+            operator="equals",
+            expected_value=True,
+            criterion_result=CriterionResult.SATISFIED,
+            criterion_validity=CriterionValidity.VALID,
+            evidence_refs=("artifact:draft@1",),
+        )
+
+
+def test_unused_threshold_is_absent_in_emitted_trace(tmp_path):
+    store = ArtifactStore(tmp_path)
+    digest = store.put_immutable(
+        CandidatePayload(actions=[{"action_id": "a", "depends_on": []}]),
+        "draft",
+        1,
+        "planning",
+        "1.0",
+    )
+    trace = ScannerGateway(store).scan_exact(
+        artifact_ref("draft", 1, digest), "repo", ("dependency_readiness",)
+    ).trace_steps[0]
+    assert "threshold" not in trace.model_dump(mode="json")
+
+
+def test_malformed_candidate_emits_unknown_not_false(tmp_path):
+    store = ArtifactStore(tmp_path)
+    digest = store.put_immutable(
+        CandidatePayload(actions=[{"action_id": "a", "depends_on": "invalid"}]),
+        "malformed",
+        1,
+        "planning",
+        "1.0",
+    )
+    result = ScannerGateway(store).scan_exact(
+        artifact_ref("malformed", 1, digest), "repo", ("dependency_readiness",)
+    )
+    assert result.outcome is ScannerOutcome.BLOCKED
+    assert result.capabilities_not_checked == ("dependency_readiness",)
+    assert result.trace_steps[0].criterion_result is CriterionResult.UNKNOWN
+    assert result.trace_steps[0].observed_value is None
+    assert len(result.evidence_requests) == 1
+    assert not result.findings
+
+
 def make_planning_record() -> PlanningRecord:
     action_base = {
         "requirement_ids": ("REQ-001",),
