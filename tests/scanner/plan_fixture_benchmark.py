@@ -29,6 +29,16 @@ class UnrepresentableFixture(Exception):
     """Only known schema incompatibilities are excluded from scoring."""
 
 
+def canonical_requirement(value: str) -> str:
+    """Normalize fixture REQ-1 to native REQ-001 without changing requirement identity."""
+    return f"REQ-{int(value.removeprefix('REQ-')):03d}"
+
+
+def canonical_criterion(value: str) -> str:
+    """Normalize fixture C1 to native AC-001 without introducing a criterion."""
+    return f"AC-{int(value.removeprefix('C')):03d}"
+
+
 def load(name: str, key: str) -> dict[str, Any]:
     return json.loads((DATA / name).read_text(encoding="utf-8"))[key]
 
@@ -50,6 +60,7 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
 
     adapter_limits = [
         "synthetic fixture has no CodeIntent/preconditions/recovery receipts; non-authoritative placeholders used",
+        "fixture REQ-1/C1 identifiers normalized losslessly to native REQ-001/AC-001 patterns",
         "source snapshot completeness is unverified, so missing source paths remain uncertainty",
     ]
     actions = []
@@ -58,10 +69,10 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
         related_tasks = [task for task in plan["tasks"] if aid in task["action_refs"]]
         if not related_tasks:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no fixture task mapping")
-        requirement_ids = tuple(sorted({rid for task in related_tasks for rid in task["requirement_refs"]}))
+        requirement_ids = tuple(sorted({canonical_requirement(rid) for task in related_tasks for rid in task["requirement_refs"]}))
         if not requirement_ids:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no requirement mapping")
-        relevant_checks = [check for check in checks if check["requirement_ref"] in requirement_ids]
+        relevant_checks = [check for check in checks if canonical_requirement(check["requirement_ref"]) in requirement_ids]
         if not relevant_checks:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no validation check")
         path = row["path"]
@@ -73,7 +84,7 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
         fields = {
             "action_id": aid,
             "requirement_ids": requirement_ids,
-            "acceptance_criteria_ids": tuple(check["check_id"] for check in relevant_checks),
+            "acceptance_criteria_ids": tuple(canonical_criterion(check["check_id"]) for check in relevant_checks),
             "code_intent_ids": tuple(f"synthetic:{task['task_id']}" for task in related_tasks),
             "preconditions": ("synthetic:source-inspection-not-authorized",),
             "depends_on": tuple(row["depends_on"]),
@@ -98,7 +109,7 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
     assumptions = tuple(
         PlanAssumption(
             assumption_id=f"assumption-{idx}",
-            requirement_id=item["accepted_requirements"][0]["id"],
+            requirement_id=canonical_requirement(item["accepted_requirements"][0]["id"]),
             statement=assumption["claim"],
             status="supported" if assumption["status"] == "verified" else "unknown",
             evidence_refs=(),
@@ -152,11 +163,11 @@ def run() -> dict[str, Any]:
                 candidate,
                 sources,
                 source_id=f"synthetic:{key}",
-                accepted_requirements=tuple(req["id"] for req in item["accepted_requirements"]),
+                accepted_requirements=tuple(canonical_requirement(req["id"]) for req in item["accepted_requirements"]),
                 allowed_paths=tuple(item["scope"]["allowed_paths"]),
                 required_criteria={
-                    req["id"]: tuple(
-                        check["check_id"]
+                    canonical_requirement(req["id"]): tuple(
+                        canonical_criterion(check["check_id"])
                         for check in item["plan"]["acceptance_checks"]
                         if check["requirement_ref"] == req["id"]
                     )
