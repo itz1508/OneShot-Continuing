@@ -322,7 +322,6 @@ def test_unsupported_assumption_does_not_become_verified_by_self_claim():
     assert observed == ()
 
 
-
 def test_plan_repair_rejects_fabricated_evidence_reference():
     defective = candidate(modify(path="app/missing.py"))
     with pytest.raises(ValueError, match="not independently verified"):
