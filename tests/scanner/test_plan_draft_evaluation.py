@@ -15,6 +15,7 @@ from agent.contracts.planning import (
     BuildSpecification,
     CandidateSpecification,
     ModifyAction,
+    PlanAssumption,
     RemoveAction,
     RequirementCoverage,
 )
@@ -59,6 +60,7 @@ def modify(
 def candidate(
     *actions: ModifyAction | RemoveAction,
     coverage: tuple[RequirementCoverage, ...] = (),
+    assumptions: tuple[PlanAssumption, ...] = (),
 ) -> CandidateSpecification:
     return CandidateSpecification(
         candidate_id="fixture-candidate",
@@ -68,6 +70,7 @@ def candidate(
             objective="Implement the accepted behavior",
             actions=actions,
             requirement_coverage=coverage,
+            assumptions=assumptions,
         ),
     )
 
@@ -80,6 +83,7 @@ def scan(
     accepted: tuple[str, ...] = ("REQ-001",),
     criteria: dict[str, tuple[str, ...]] | None = None,
     complete: bool = True,
+    verified_evidence_refs: tuple[str, ...] = (),
 ):
     return scan_plan_draft(
         plan,
@@ -89,6 +93,7 @@ def scan(
         allowed_paths=allowed,
         required_criteria=criteria,
         source_snapshot_complete=complete,
+        verified_evidence_refs=verified_evidence_refs,
     )
 
 
@@ -272,3 +277,43 @@ def test_existing_gateway_uses_immutable_artifact_and_registered_detector(tmp_pa
     result = gateway.scan_exact(ref, "fixture-repo", ("plan_structure",))
     assert result.outcome.value == "pass"
     assert result.findings == ()
+
+
+def test_recoverable_unknown_assumption_is_carried_not_fabricated():
+    plan = candidate(
+        modify(),
+        assumptions=(
+            PlanAssumption(
+                assumption_id="assumption-001",
+                requirement_id="REQ-001",
+                statement="Provider endpoint is available in deployment environment",
+                status="unknown",
+                verification_stage="Preflight",
+            ),
+        ),
+    )
+    findings = scan(plan)
+    assert categories(findings) == {"unresolved_assumption"}
+    assert findings[0].disposition == "uncertainty"
+    assert findings[0].owner_stage == "Preflight"
+
+
+def test_unsupported_assumption_does_not_become_verified_by_self_claim():
+    plan = candidate(
+        modify(),
+        assumptions=(
+            PlanAssumption(
+                assumption_id="assumption-001",
+                requirement_id="REQ-001",
+                statement="Provider reports expected schema",
+                status="supported",
+                evidence_refs=("research:provider-schema",),
+            ),
+        ),
+    )
+    findings = scan(plan)
+    assert categories(findings) == {"unsupported_evidence_claim"}
+    assert findings[0].disposition == "blocking"
+
+    observed = scan(plan, verified_evidence_refs=("research:provider-schema",))
+    assert observed == ()
