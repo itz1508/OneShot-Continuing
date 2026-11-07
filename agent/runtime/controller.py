@@ -323,9 +323,7 @@ class HostController:
         )
         try:
             with scanner_span(task_id, run_id, candidate_ref.artifact_id):
-                result = self.scanner.scan_exact(
-                    candidate_ref, repository_identity, capabilities, on_event=publish
-                )
+                result = self.scanner.scan_exact(candidate_ref, repository_identity, capabilities, on_event=publish)
             result = result.model_copy(update={"request_id": scan_id, "candidate_ref": candidate_ref})
             digest = self.artifact_store.put_immutable(result, scan_id, 1, "scanner_result", "1.1")
         except Exception:

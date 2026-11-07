@@ -122,6 +122,7 @@ class ScannerGateway:
         matches the expected digest in the candidate_ref. Returns BLOCKED
         if the artifact store is unavailable or the artifact cannot be verified.
         """
+
         def publish(event_type: str, message: str, **details: object) -> None:
             if on_event is not None:
                 on_event(event_type, {"message": message, **details})
@@ -256,8 +257,10 @@ class ScannerGateway:
                     evidence_requests.extend(unresolved.evidence_requests)
                     report(cap, unresolved.trace_steps, unresolved.evidence_requests, ())
                 publish(
-                    "scanner_capability", f"{cap}: detector could not check evidence",
-                    capability=cap, status="not_checked",
+                    "scanner_capability",
+                    f"{cap}: detector could not check evidence",
+                    capability=cap,
+                    status="not_checked",
                 )
                 continue
             checked.append(cap)

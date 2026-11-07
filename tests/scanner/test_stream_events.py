@@ -31,7 +31,13 @@ def test_host_emits_durable_check_trace_findings_cache_and_result(tmp_path, monk
 
     observed: list[dict[str, object]] = []
     scan = host.scan_planning_candidate(
-        record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None,
+        record.task_id,
+        record.run_id,
+        ref,
+        "repo",
+        ("dependency_readiness",),
+        None,
+        None,
         on_event=observed.append,
     )
     assert scan.outcome is ScannerOutcome.BLOCKED
@@ -44,8 +50,7 @@ def test_host_emits_durable_check_trace_findings_cache_and_result(tmp_path, monk
     assert all(event["detail"]["scan_id"] == scan.request_id for event in observed)
     assert [event["sequence"] for event in observed] == sorted(event["sequence"] for event in observed)
     assert any(
-        event["detail"]["criterion_result"] == "not_satisfied"
-        for event in observed if event["type"] == "scanner_check"
+        event["detail"]["criterion_result"] == "not_satisfied" for event in observed if event["type"] == "scanner_check"
     )
     recorded = host.event_store.list(record.task_id)
     emitted = [event for event in recorded if event["event_type"] in set(types)]
@@ -61,7 +66,13 @@ def test_host_emits_durable_check_trace_findings_cache_and_result(tmp_path, monk
     # The second invocation still emits executed comparisons and a new immutable result.
     again: list[dict[str, object]] = []
     second = host.scan_planning_candidate(
-        record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None,
+        record.task_id,
+        record.run_id,
+        ref,
+        "repo",
+        ("dependency_readiness",),
+        None,
+        None,
         on_event=again.append,
     )
     assert second.request_id != scan.request_id
@@ -80,7 +91,9 @@ def test_unknown_evidence_requests_and_authorized_repair_emit_events(tmp_path, m
     # A missing exact artifact is UNKNOWN and produces an evidence request without a finding.
     unknown_events: list[tuple[str, dict[str, object]]] = []
     missing = host.scanner.scan_exact(
-        artifact_ref("missing", 1, "a" * 64), "repo", ("dependency_readiness",),
+        artifact_ref("missing", 1, "a" * 64),
+        "repo",
+        ("dependency_readiness",),
         on_event=lambda event, detail: unknown_events.append((event, detail)),
     )
     assert missing.outcome is ScannerOutcome.BLOCKED
