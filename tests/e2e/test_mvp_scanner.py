@@ -134,3 +134,23 @@ def test_scanner_api_rejects_cross_run_and_non_planning_stage(tmp_path, monkeypa
     assert response.status_code == 400
     assert "Planning stage" in response.json()["detail"]
     assert not [e for e in service.events(task_id) if e["type"].startswith("scanner_")]
+
+
+def test_cli_module_command_dispatches_the_same_host_scan(tmp_path, monkeypatch, capsys):
+    from agent.cli import main
+
+    service, task_id, request = prepared_scanner(tmp_path)
+    monkeypatch.setattr(HostController, "_verify_structural_gap", lambda *args: None)
+    request_file = tmp_path / "scan-request.json"
+    request_file.write_text(request.model_dump_json())
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agent", "scan", task_id, str(request_file), "--state-root", str(tmp_path)],
+    )
+
+    assert main() == 2
+    output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert output[0]["type"] == "scanner_started"
+    assert output[-1]["type"] == "scanner_result"
+    assert output[-1]["result"]["request_id"] == output[-2]["detail"]["scan_id"]
+    assert service.events(task_id)[-1]["type"] == "scanner_completed"
