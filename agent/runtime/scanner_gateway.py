@@ -241,8 +241,8 @@ class ScannerGateway:
                             artifact_bytes,
                             target,
                             evidence,
-                            on_step=lambda step, finding: report(
-                                cap, (step,), (), (finding,) if finding is not None else ()
+                            on_step=lambda step, finding, capability=cap: report(
+                                capability, (step,), (), (finding,) if finding is not None else ()
                             ),
                         )
                         report(cap, (), result.evidence_requests, ())
