@@ -1,0 +1,1669 @@
+{
+  "inputs": {
+    "case_01/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Update normalize_path in app/url.py to remove trailing slash but retain the query string"
+        }
+      ],
+      "intent": "Preserve query parameters when trimming URL paths",
+      "item_id": "item-01",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "normalize_path('/p/?x=1') returns '/p?x=1'",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Preserve the query component when normalizing path",
+            "operation": "modify",
+            "path": "app/url.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update the existing normalize_path function",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/url.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/url.py": {
+          "content": "def normalize_path(path: str) -> str:\n    return path.rstrip('/')\n",
+          "sha256": "76c543b62ff8beb682756a12688b6959082ec58f5b8ef88a3a25d3ec40ed9f0e"
+        }
+      }
+    },
+    "case_01/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Update normalize_path in app/url.py to remove trailing slash but retain the query string"
+        }
+      ],
+      "intent": "Preserve query parameters when trimming URL paths",
+      "item_id": "item-01",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "normalize_path('/p/?x=1') returns '/p?x=1'",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Preserve the query component when normalizing path",
+            "operation": "modify",
+            "path": "app/url_helpers.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update the existing normalize_path function",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/url.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/url.py": {
+          "content": "def normalize_path(path: str) -> str:\n    return path.rstrip('/')\n",
+          "sha256": "76c543b62ff8beb682756a12688b6959082ec58f5b8ef88a3a25d3ec40ed9f0e"
+        }
+      }
+    },
+    "case_02/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Expose verify_token in the service and use it in the API, retaining TokenClaims contract"
+        }
+      ],
+      "intent": "Add verified-token handling across service and API",
+      "item_id": "item-02",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "integration_test",
+            "expected_observation": "API request uses verify_token and returns TokenClaims",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Document verified claim shape",
+            "operation": "modify",
+            "path": "app/contracts.py"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [
+              "A1"
+            ],
+            "detail": "Implement verify_token returning TokenClaims",
+            "operation": "modify",
+            "path": "app/service.py"
+          },
+          {
+            "action_id": "A3",
+            "depends_on": [],
+            "detail": "Import and call verify_token from app.service",
+            "operation": "modify",
+            "path": "app/api.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update contract",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [
+              "T1"
+            ],
+            "description": "Implement service function",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          },
+          {
+            "action_refs": [
+              "A3"
+            ],
+            "depends_on": [],
+            "description": "Wire API route",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T3"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/contracts.py",
+          "app/service.py",
+          "app/api.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/api.py": {
+          "content": "from app.service import parse_token\n",
+          "sha256": "03eef7b6ec500ab14ae447983f40b51985cbb5478292d4c2e4c07ace3992546f"
+        },
+        "app/contracts.py": {
+          "content": "class TokenClaims:\n    subject: str\n",
+          "sha256": "95ccb8c348d5065e6991547143358e6a1fcf433c8a7a57bb53782419f5c2d7d8"
+        },
+        "app/service.py": {
+          "content": "from app.contracts import TokenClaims\n\ndef parse_token(s: str) -> TokenClaims:\n    ...\n",
+          "sha256": "9aae2543aab704faa9d671a06e6919ca58ed758aeb4d7c0ab589bb7fecb8c6d7"
+        }
+      }
+    },
+    "case_02/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Expose verify_token in the service and use it in the API, retaining TokenClaims contract"
+        }
+      ],
+      "intent": "Add verified-token handling across service and API",
+      "item_id": "item-02",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "integration_test",
+            "expected_observation": "API request uses verify_token and returns TokenClaims",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Document verified claim shape",
+            "operation": "modify",
+            "path": "app/contracts.py"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [
+              "A1"
+            ],
+            "detail": "Implement verify_token returning TokenClaims",
+            "operation": "modify",
+            "path": "app/service.py"
+          },
+          {
+            "action_id": "A3",
+            "depends_on": [
+              "A2"
+            ],
+            "detail": "Import and call verify_token from app.service",
+            "operation": "modify",
+            "path": "app/api.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update contract",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [
+              "T1"
+            ],
+            "description": "Implement service function",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          },
+          {
+            "action_refs": [
+              "A3"
+            ],
+            "depends_on": [
+              "T2"
+            ],
+            "description": "Wire API route",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T3"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/contracts.py",
+          "app/service.py",
+          "app/api.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/api.py": {
+          "content": "from app.service import parse_token\n",
+          "sha256": "03eef7b6ec500ab14ae447983f40b51985cbb5478292d4c2e4c07ace3992546f"
+        },
+        "app/contracts.py": {
+          "content": "class TokenClaims:\n    subject: str\n",
+          "sha256": "95ccb8c348d5065e6991547143358e6a1fcf433c8a7a57bb53782419f5c2d7d8"
+        },
+        "app/service.py": {
+          "content": "from app.contracts import TokenClaims\n\ndef parse_token(s: str) -> TokenClaims:\n    ...\n",
+          "sha256": "9aae2543aab704faa9d671a06e6919ca58ed758aeb4d7c0ab589bb7fecb8c6d7"
+        }
+      }
+    },
+    "case_03/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Responses must include X-Content-Type-Options: nosniff"
+        }
+      ],
+      "intent": "Ensure security headers are set",
+      "item_id": "item-03",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "source_inspection",
+            "expected_observation": "headers()['X-Content-Type-Options'] equals 'nosniff'",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [],
+            "depends_on": [],
+            "description": "Confirm header is already present in existing code",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/http.py",
+          "app/user.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/http.py": {
+          "content": "def headers():\n    return {'X-Content-Type-Options': 'nosniff'}\n",
+          "sha256": "756ffeb94b9a8bd23fb75a917ea4b638b2cc76878a351d7693380c73424d926b"
+        },
+        "app/user.py": {
+          "content": "def user_id():\n    return 12\n",
+          "sha256": "aef93fab74d3de56722919037a0bea49d8a13f19069075b8a9aadab87f4944f7"
+        }
+      }
+    },
+    "case_03/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Responses must include X-Content-Type-Options: nosniff"
+        }
+      ],
+      "intent": "Ensure security headers are set",
+      "item_id": "item-03",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "source_inspection",
+            "expected_observation": "headers()['X-Content-Type-Options'] equals 'nosniff'",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Delete existing user identifier helper",
+            "operation": "remove",
+            "path": "app/user.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [],
+            "depends_on": [],
+            "description": "Confirm header is already present in existing code",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Remove unrelated user module",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/http.py",
+          "app/user.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/http.py": {
+          "content": "def headers():\n    return {'X-Content-Type-Options': 'nosniff'}\n",
+          "sha256": "756ffeb94b9a8bd23fb75a917ea4b638b2cc76878a351d7693380c73424d926b"
+        },
+        "app/user.py": {
+          "content": "def user_id():\n    return 12\n",
+          "sha256": "aef93fab74d3de56722919037a0bea49d8a13f19069075b8a9aadab87f4944f7"
+        }
+      }
+    },
+    "case_04/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Use httpx for outbound API calls and record the dependency in pyproject.toml"
+        }
+      ],
+      "intent": "Add typed outbound HTTP requests",
+      "item_id": "item-04",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "dependency_and_unit_test",
+            "expected_observation": "Dependency resolves and client request can be mocked",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A2",
+            "depends_on": [],
+            "detail": "Use httpx.AsyncClient for outbound request",
+            "operation": "modify",
+            "path": "app/remote.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [],
+            "description": "Implement client",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "pyproject.toml",
+          "app/remote.py"
+        ],
+        "external_dependencies_allowed": true
+      },
+      "source_snapshot": {
+        "app/remote.py": {
+          "content": "def get_remote(url: str):\n    raise NotImplementedError\n",
+          "sha256": "b1f14089934b5b2b2710812fd57174a8dbe423094f1b2dc3211782c9ad864d6a"
+        },
+        "pyproject.toml": {
+          "content": "[project]\nname='fixture-service'\nversion='0.1.0'\ndependencies=[]\n",
+          "sha256": "d57ec8d60f4cf7534a4e3283a7ed5fe77588e51a73e6d8adb5857531a8e997c8"
+        }
+      }
+    },
+    "case_04/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Use httpx for outbound API calls and record the dependency in pyproject.toml"
+        }
+      ],
+      "intent": "Add typed outbound HTTP requests",
+      "item_id": "item-04",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "dependency_and_unit_test",
+            "expected_observation": "Dependency resolves and client request can be mocked",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Install/lock httpx dependency",
+            "operation": "modify",
+            "path": "pyproject.toml"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [
+              "A1"
+            ],
+            "detail": "Use httpx.AsyncClient for outbound request",
+            "operation": "modify",
+            "path": "app/remote.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Add and lock required dependency",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [
+              "T1"
+            ],
+            "description": "Implement client",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "pyproject.toml",
+          "app/remote.py"
+        ],
+        "external_dependencies_allowed": true
+      },
+      "source_snapshot": {
+        "app/remote.py": {
+          "content": "def get_remote(url: str):\n    raise NotImplementedError\n",
+          "sha256": "b1f14089934b5b2b2710812fd57174a8dbe423094f1b2dc3211782c9ad864d6a"
+        },
+        "pyproject.toml": {
+          "content": "[project]\nname='fixture-service'\nversion='0.1.0'\ndependencies=[]\n",
+          "sha256": "d57ec8d60f4cf7534a4e3283a7ed5fe77588e51a73e6d8adb5857531a8e997c8"
+        }
+      }
+    },
+    "case_05/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Replace slow JSON serialization with orjson after adding and locking dependency"
+        }
+      ],
+      "intent": "Use orjson in serialization",
+      "item_id": "item-05",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "runtime_import_and_unit_test",
+            "expected_observation": "orjson is importable and encode returns bytes",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Install and lock orjson",
+            "operation": "modify",
+            "path": "pyproject.toml"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [
+              "A1"
+            ],
+            "detail": "Use orjson.dumps",
+            "operation": "modify",
+            "path": "app/encoder.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Resolve dependency",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [
+              "T1"
+            ],
+            "description": "Change encoding",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "pyproject.toml",
+          "app/encoder.py"
+        ],
+        "external_dependencies_allowed": true
+      },
+      "source_snapshot": {
+        "app/encoder.py": {
+          "content": "import json\ndef encode(v): return json.dumps(v).encode()\n",
+          "sha256": "a806aa50ca3076ad0a6a51f49da4850fd1408a021379c17a84997a6748766556"
+        },
+        "pyproject.toml": {
+          "content": "[project]\nname='fixture-service'\nversion='0.1.0'\ndependencies=[]\n",
+          "sha256": "d57ec8d60f4cf7534a4e3283a7ed5fe77588e51a73e6d8adb5857531a8e997c8"
+        }
+      }
+    },
+    "case_05/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Replace slow JSON serialization with orjson after adding and locking dependency"
+        }
+      ],
+      "intent": "Use orjson in serialization",
+      "item_id": "item-05",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "runtime_import_and_unit_test",
+            "expected_observation": "orjson is importable and encode returns bytes",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Install and lock orjson",
+            "operation": "modify",
+            "path": "pyproject.toml"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [],
+            "detail": "Use orjson.dumps",
+            "operation": "modify",
+            "path": "app/encoder.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [
+              "T2"
+            ],
+            "description": "Resolve dependency",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [],
+            "description": "Change encoding",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "pyproject.toml",
+          "app/encoder.py"
+        ],
+        "external_dependencies_allowed": true
+      },
+      "source_snapshot": {
+        "app/encoder.py": {
+          "content": "import json\ndef encode(v): return json.dumps(v).encode()\n",
+          "sha256": "a806aa50ca3076ad0a6a51f49da4850fd1408a021379c17a84997a6748766556"
+        },
+        "pyproject.toml": {
+          "content": "[project]\nname='fixture-service'\nversion='0.1.0'\ndependencies=[]\n",
+          "sha256": "d57ec8d60f4cf7534a4e3283a7ed5fe77588e51a73e6d8adb5857531a8e997c8"
+        }
+      }
+    },
+    "case_06/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Increase API_TIMEOUT from 10 to 20 seconds in config"
+        }
+      ],
+      "intent": "Increase API timeout",
+      "item_id": "item-06",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "API_TIMEOUT equals 20",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Change API_TIMEOUT to 20",
+            "operation": "modify",
+            "path": "app/config.py"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [],
+            "detail": "Remove the same config file",
+            "operation": "remove",
+            "path": "app/config.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update timeout",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [],
+            "description": "Remove config file",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/config.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/config.py": {
+          "content": "API_TIMEOUT = 10\n",
+          "sha256": "72eb8a7509ad6bec4c667441cd60eed966679bbaa16d2477b2df8c3d3ccf854f"
+        }
+      }
+    },
+    "case_06/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Increase API_TIMEOUT from 10 to 20 seconds in config"
+        }
+      ],
+      "intent": "Increase API timeout",
+      "item_id": "item-06",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "API_TIMEOUT equals 20",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Change API_TIMEOUT to 20",
+            "operation": "modify",
+            "path": "app/config.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Update timeout",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/config.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/config.py": {
+          "content": "API_TIMEOUT = 10\n",
+          "sha256": "72eb8a7509ad6bec4c667441cd60eed966679bbaa16d2477b2df8c3d3ccf854f"
+        }
+      }
+    },
+    "case_07/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Cache ttl parameter must cause values to expire after the requested seconds"
+        }
+      ],
+      "intent": "Support configurable cache expiry",
+      "item_id": "item-07",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test_with_fake_clock",
+            "expected_observation": "Entry becomes unavailable after TTL expires on a controlled clock",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement TTL logic",
+            "operation": "modify",
+            "path": "app/cache.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Implement TTL",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/cache.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/cache.py": {
+          "content": "class Cache:\n    def get(self, key): return None\n",
+          "sha256": "1a6c1ed4f3f58bf59bfadb925f7d8ed81fbfc731e40ef50fbdbd8ebb86e152a4"
+        }
+      }
+    },
+    "case_07/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Cache ttl parameter must cause values to expire after the requested seconds"
+        }
+      ],
+      "intent": "Support configurable cache expiry",
+      "item_id": "item-07",
+      "plan": {
+        "acceptance_checks": [],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement TTL logic",
+            "operation": "modify",
+            "path": "app/cache.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Implement TTL",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/cache.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/cache.py": {
+          "content": "class Cache:\n    def get(self, key): return None\n",
+          "sha256": "1a6c1ed4f3f58bf59bfadb925f7d8ed81fbfc731e40ef50fbdbd8ebb86e152a4"
+        }
+      }
+    },
+    "case_08/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Sort report rows by month and account before export"
+        }
+      ],
+      "intent": "Sort monthly financial report deterministically",
+      "item_id": "item-08",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "Export order deterministic for shuffled inputs",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Sort rows by (month, account)",
+            "operation": "modify",
+            "path": "app/report.py"
+          },
+          {
+            "action_id": "A2",
+            "depends_on": [],
+            "detail": "Change user lookup semantics",
+            "operation": "modify",
+            "path": "app/users.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Sort export",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          },
+          {
+            "action_refs": [
+              "A2"
+            ],
+            "depends_on": [],
+            "description": "Rewrite user lookup",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T2"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/report.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/report.py": {
+          "content": "def export(rows):\n    return rows\n",
+          "sha256": "29ba0d4c1692a5991c4dd86a8d4b013ff0a40c5593ee16eab6e3f8426b54f66f"
+        },
+        "app/users.py": {
+          "content": "def get_users(): return []\n",
+          "sha256": "6a594f89c7aa8649e02ba88b64bf39be99ae96014d136a15e295f478e1b2ab9c"
+        }
+      }
+    },
+    "case_08/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Sort report rows by month and account before export"
+        }
+      ],
+      "intent": "Sort monthly financial report deterministically",
+      "item_id": "item-08",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "unit_test",
+            "expected_observation": "Export order deterministic for shuffled inputs",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Sort rows by (month, account)",
+            "operation": "modify",
+            "path": "app/report.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Sort export",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/report.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/report.py": {
+          "content": "def export(rows):\n    return rows\n",
+          "sha256": "29ba0d4c1692a5991c4dd86a8d4b013ff0a40c5593ee16eab6e3f8426b54f66f"
+        },
+        "app/users.py": {
+          "content": "def get_users(): return []\n",
+          "sha256": "6a594f89c7aa8649e02ba88b64bf39be99ae96014d136a15e295f478e1b2ab9c"
+        }
+      }
+    },
+    "case_09/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Handle provider SSE if an authoritative provider contract confirms the event format"
+        }
+      ],
+      "intent": "Receive provider streaming events",
+      "item_id": "item-09",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "contract_test",
+            "expected_observation": "Known provider event fixture parses and unknown event is rejected",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "Provider event schema is not yet known",
+            "owner_stage": "Research",
+            "required_check": "Obtain and verify authoritative schema before implementation",
+            "resolve_before": "T1",
+            "status": "unknown"
+          }
+        ],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement event handler only after provider schema is checked",
+            "operation": "modify",
+            "path": "app/stream.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Research provider event schema then implement supported format",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "docs/provider.md",
+          "app/stream.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/stream.py": {
+          "content": "def handle_event(event):\n    raise NotImplementedError\n",
+          "sha256": "00034e1620ef0dc210759019c25cd4882e5f52f484c3db25239c9dbac2b9c4a7"
+        },
+        "docs/provider.md": {
+          "content": "Provider integration required. Event names and payload schema not documented in this snapshot.\n",
+          "sha256": "65a2c548aea7659f5229373243f6e350d1d24e0c795a327e6e1838321364f5ab"
+        }
+      }
+    },
+    "case_09/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Handle provider SSE if an authoritative provider contract confirms the event format"
+        }
+      ],
+      "intent": "Receive provider streaming events",
+      "item_id": "item-09",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "contract_test",
+            "expected_observation": "Known provider event fixture parses and unknown event is rejected",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "Provider events always use `message.delta`",
+            "owner_stage": "Research",
+            "required_check": "none",
+            "resolve_before": "none",
+            "status": "verified"
+          }
+        ],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement event handler only after provider schema is checked",
+            "operation": "modify",
+            "path": "app/stream.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Research provider event schema then implement supported format",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "docs/provider.md",
+          "app/stream.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/stream.py": {
+          "content": "def handle_event(event):\n    raise NotImplementedError\n",
+          "sha256": "00034e1620ef0dc210759019c25cd4882e5f52f484c3db25239c9dbac2b9c4a7"
+        },
+        "docs/provider.md": {
+          "content": "Provider integration required. Event names and payload schema not documented in this snapshot.\n",
+          "sha256": "65a2c548aea7659f5229373243f6e350d1d24e0c795a327e6e1838321364f5ab"
+        }
+      }
+    },
+    "case_10/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Add a read-only queue health endpoint"
+        }
+      ],
+      "intent": "Expose queue health endpoint",
+      "item_id": "item-10",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "integration_test",
+            "expected_observation": "Endpoint returns integer queue size",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Add health endpoint returning queue size",
+            "operation": "modify",
+            "path": "app/queue.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Implement quuee health endpoint",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/queue.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/queue.py": {
+          "content": "def queue_size(): return 0\n",
+          "sha256": "8da2c16f5bf7c5574b71932b3a688b0879462f2a0dd5f25a90af764f1f398b28"
+        }
+      }
+    },
+    "case_10/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Add a read-only queue health endpoint"
+        }
+      ],
+      "intent": "Expose queue health endpoint",
+      "item_id": "item-10",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "integration_test",
+            "expected_observation": "Endpoint returns integer queue size",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Add health endpoint returning queue size",
+            "operation": "modify",
+            "path": "app/queue.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Implement queue health endpoint",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/queue.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/queue.py": {
+          "content": "def queue_size(): return 0\n",
+          "sha256": "8da2c16f5bf7c5574b71932b3a688b0879462f2a0dd5f25a90af764f1f398b28"
+        }
+      }
+    },
+    "case_11/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Use existing render_card export from app.renderer in app.web"
+        }
+      ],
+      "intent": "Render cards on the web page",
+      "item_id": "item-11",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "import_and_integration_test",
+            "expected_observation": "web.page can import render_card and renders a card",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Import render_card from app.renderer and call it",
+            "operation": "modify",
+            "path": "app/web.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Wire existing renderer into web module",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/renderer.py",
+          "app/web.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/renderer.py": {
+          "content": "def render_card(title: str) -> str:\n    return f'<article>{title}</article>'\n",
+          "sha256": "373ff14079202c587e2006767964ce78b81d8078222a8da355df0bd3e8625b7e"
+        },
+        "app/web.py": {
+          "content": "def page(): return ''\n",
+          "sha256": "6f45a29b8554a5d98e255c20c2ccb1aa7b67391416ff733da6ce98c5b51d70b5"
+        }
+      }
+    },
+    "case_11/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Use existing render_card export from app.renderer in app.web"
+        }
+      ],
+      "intent": "Render cards on the web page",
+      "item_id": "item-11",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "import_and_integration_test",
+            "expected_observation": "web.page can import render_card and renders a card",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Import render_cards from app.renderer and call it",
+            "operation": "modify",
+            "path": "app/web.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Wire existing renderer into web module",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/renderer.py",
+          "app/web.py"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/renderer.py": {
+          "content": "def render_card(title: str) -> str:\n    return f'<article>{title}</article>'\n",
+          "sha256": "373ff14079202c587e2006767964ce78b81d8078222a8da355df0bd3e8625b7e"
+        },
+        "app/web.py": {
+          "content": "def page(): return ''\n",
+          "sha256": "6f45a29b8554a5d98e255c20c2ccb1aa7b67391416ff733da6ce98c5b51d70b5"
+        }
+      }
+    },
+    "case_12/a": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Send outbound notifications once provider credentials and reachability are established"
+        }
+      ],
+      "intent": "Send notifications through configured provider",
+      "item_id": "item-12",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "preflight_and_integration_test",
+            "expected_observation": "Preflight proves provider access before send and delivery records response",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "Provider is reachable and configured",
+            "owner_stage": "Builder Preflight",
+            "required_check": "none",
+            "resolve_before": "none",
+            "status": "verified"
+          }
+        ],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement notification using confirmed reachable provider",
+            "operation": "modify",
+            "path": "app/notify.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Preflight provider access then implement delivery",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/notify.py",
+          "docs/runtime.md"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/notify.py": {
+          "content": "def send_notice(msg):\n    raise NotImplementedError\n",
+          "sha256": "075931e1e3fc3523c36d3af8faee94d19d5966e6739612ea9e4c6407bad94e54"
+        },
+        "docs/runtime.md": {
+          "content": "Provider credentials are injected at deployment. Connectivity is not guaranteed in development.\n",
+          "sha256": "25860a1984cba3e30da864ce47da1a630f38cca1c507e1a53e2203e834a9e81e"
+        }
+      }
+    },
+    "case_12/b": {
+      "accepted_requirements": [
+        {
+          "id": "REQ-1",
+          "text": "Send outbound notifications once provider credentials and reachability are established"
+        }
+      ],
+      "intent": "Send notifications through configured provider",
+      "item_id": "item-12",
+      "plan": {
+        "acceptance_checks": [
+          {
+            "check_id": "C1",
+            "evidence_type": "preflight_and_integration_test",
+            "expected_observation": "Preflight proves provider access before send and delivery records response",
+            "requirement_ref": "REQ-1"
+          }
+        ],
+        "assumptions": [
+          {
+            "claim": "Provider credentials and network availability at runtime",
+            "owner_stage": "Builder Preflight",
+            "required_check": "Authorized connectivity and credential preflight",
+            "resolve_before": "T1",
+            "status": "unknown"
+          }
+        ],
+        "file_actions": [
+          {
+            "action_id": "A1",
+            "depends_on": [],
+            "detail": "Implement notification using confirmed reachable provider",
+            "operation": "modify",
+            "path": "app/notify.py"
+          }
+        ],
+        "revision": 1,
+        "tasks": [
+          {
+            "action_refs": [
+              "A1"
+            ],
+            "depends_on": [],
+            "description": "Preflight provider access then implement delivery",
+            "requirement_refs": [
+              "REQ-1"
+            ],
+            "task_id": "T1"
+          }
+        ]
+      },
+      "schema_marker": "synthetic-evaluation-fixture-v1",
+      "scope": {
+        "allowed_paths": [
+          "app/notify.py",
+          "docs/runtime.md"
+        ],
+        "external_dependencies_allowed": false
+      },
+      "source_snapshot": {
+        "app/notify.py": {
+          "content": "def send_notice(msg):\n    raise NotImplementedError\n",
+          "sha256": "075931e1e3fc3523c36d3af8faee94d19d5966e6739612ea9e4c6407bad94e54"
+        },
+        "docs/runtime.md": {
+          "content": "Provider credentials are injected at deployment. Connectivity is not guaranteed in development.\n",
+          "sha256": "25860a1984cba3e30da864ce47da1a630f38cca1c507e1a53e2203e834a9e81e"
+        }
+      }
+    }
+  },
+  "schema": "aakr-synthetic-plan-fixtures-v1"
+}
