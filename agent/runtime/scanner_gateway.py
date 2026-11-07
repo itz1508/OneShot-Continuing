@@ -235,11 +235,23 @@ class ScannerGateway:
                 if traced_detector is not None:
                     target = f"{candidate_ref.artifact_id}@{candidate_ref.artifact_revision}"
                     evidence = f"artifact:{target}#{candidate_ref.artifact_digest}"
-                    result = traced_detector(artifact_bytes, target, evidence)
+                    if traced_detector is scan_action_dependencies:
+                        # Preserve the actual detector; stream predicate observations as executed.
+                        result = scan_action_dependencies(
+                            artifact_bytes,
+                            target,
+                            evidence,
+                            on_step=lambda step, finding: report(
+                                cap, (step,), (), (finding,) if finding is not None else ()
+                            ),
+                        )
+                        report(cap, (), result.evidence_requests, ())
+                    else:
+                        result = traced_detector(artifact_bytes, target, evidence)
+                        report(cap, result.trace_steps, result.evidence_requests, result.findings)
                     findings = result.findings
                     traces.extend(result.trace_steps)
                     evidence_requests.extend(result.evidence_requests)
-                    report(cap, result.trace_steps, result.evidence_requests, findings)
                     cache_hits += result.cache_hits
                     cache_misses += result.cache_misses
                     parse_duration_ns += result.parse_duration_ns

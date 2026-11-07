@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from functools import lru_cache
 from time import perf_counter_ns
 
@@ -165,7 +166,13 @@ def parse_action_dependency_facts(parser_version: str, source_bytes: bytes) -> t
     return tuple(facts)
 
 
-def scan_action_dependencies(source_bytes: bytes, target_ref: str, evidence_ref: str) -> TracedDetectorResult:
+def scan_action_dependencies(
+    source_bytes: bytes,
+    target_ref: str,
+    evidence_ref: str,
+    *,
+    on_step: Callable[[ScannerTraceStep, ScannerFinding | None], None] | None = None,
+) -> TracedDetectorResult:
     """Emit actual dependency membership comparisons, not generated explanations."""
     before = parse_action_dependency_facts.cache_info()
     started = perf_counter_ns()
@@ -210,6 +217,9 @@ def scan_action_dependencies(source_bytes: bytes, target_ref: str, evidence_ref:
                         evidence_ref=evidence_ref,
                     )
                 )
+            # Publish the actual observed comparison before advancing to the next one.
+            if on_step is not None:
+                on_step(traces[-1], findings[-1] if not observed else None)
     if not facts:
         raise ValueError("candidate has no actions to validate")
     return TracedDetectorResult(

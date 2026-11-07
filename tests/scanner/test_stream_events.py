@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
+import agent.contracts.validation.planning as planning
 from agent.contracts.scanner import ScannerOutcome
 from agent.runtime.authorization import Capability
 from agent.runtime.controller import HostController
@@ -115,3 +118,50 @@ def test_unknown_evidence_requests_and_authorized_repair_emit_events(tmp_path, m
     types = [event["event_type"] for event in events]
     assert types.index("scanner_repair_started") < types.index("scanner_repair_completed")
     assert events[-1]["event_type"] == "scanner_repair_completed"
+
+
+def test_check_events_are_persisted_while_detector_is_still_executing(tmp_path, monkeypatch):
+    host = HostController(tmp_path)
+    record = make_planning_record()
+    producer, consumer = record.candidate.build_spec.actions
+    consumer = consumer.model_copy(update={"depends_on": ("producer", "absent")})
+    spec = record.candidate.build_spec.model_copy(update={"actions": (producer, consumer)})
+    record = record.model_copy(update={"candidate": record.candidate.model_copy(update={"build_spec": spec})})
+    digest = host.artifact_store.put_immutable(record, "slow-draft", 1, "planning", "1.0")
+    ref = artifact_ref("slow-draft", 1, digest)
+    monkeypatch.setattr(host, "_verify_structural_gap", lambda *args: None)
+
+    second_check_entered = Event()
+    continue_scan = Event()
+    real_predicate = planning._dependency_exists
+
+    def gated_membership(dependency, available):
+        if dependency == "absent":
+            second_check_entered.set()
+            if not continue_scan.wait(10):
+                raise RuntimeError("test did not release comparison")
+        return real_predicate(dependency, available)
+
+    monkeypatch.setattr(planning, "_dependency_exists", gated_membership)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            host.scan_planning_candidate,
+            record.task_id,
+            record.run_id,
+            ref,
+            "repo",
+            ("dependency_readiness",),
+            None,
+            None,
+        )
+        try:
+            assert second_check_entered.wait(8)
+            interim = host.event_store.list(record.task_id)
+            # The detector cannot have returned: its second membership comparison is blocked.
+            assert sum(event["event_type"] == "scanner_check" for event in interim) >= 2
+            assert not any(event["event_type"] == "scanner_completed" for event in interim)
+        finally:
+            continue_scan.set()
+        result = future.result(timeout=10)
+    assert result.outcome is ScannerOutcome.BLOCKED
+    assert host.event_store.list(record.task_id)[-1]["event_type"] == "scanner_completed"
