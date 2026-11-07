@@ -1,0 +1,23 @@
+name: Temporary locked dependency refresh
+on:
+  push:
+    branches: [feat/scanner-evidence-trace-20261106]
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@8d55fbecc275b1c35dbe060458839f8d30439ccf
+      - name: Resolve and commit lockfile
+        run: |
+          uv lock
+          uv lock --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "build: lock Logfire dependency resolution"
+            git push origin HEAD:feat/scanner-evidence-trace-20261106
+          fi
