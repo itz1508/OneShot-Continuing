@@ -8,6 +8,7 @@ import logging
 import os
 import sqlite3
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -53,8 +54,13 @@ allowed_origin_regex = os.environ.get(
     r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|https://.*\.modal\.run)$",
 )
 
-app = FastAPI(title="OneShot MVP API", version="0.1.0")
-app.add_event_handler("startup", configure_logfire)
+@asynccontextmanager
+async def scanner_telemetry_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    configure_logfire()
+    yield
+
+
+app = FastAPI(title="OneShot MVP API", version="0.1.0", lifespan=scanner_telemetry_lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 app.add_middleware(
     CORSMiddleware,
