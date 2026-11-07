@@ -154,3 +154,42 @@ def test_cli_module_command_dispatches_the_same_host_scan(tmp_path, monkeypatch,
     assert output[-1]["type"] == "scanner_result"
     assert output[-1]["result"]["request_id"] == output[-2]["detail"]["scan_id"]
     assert service.events(task_id)[-1]["type"] == "scanner_completed"
+
+
+
+def test_real_host_structural_gap_receipt_allows_http_scanner_without_stub(tmp_path, monkeypatch):
+    import mvp.api
+    from tests.fixtures.structural_gap import build_gap_inputs
+
+    service, task_id, scan_input = prepared_scanner(tmp_path)
+    request, runner = build_gap_inputs(service.host, task_id, scan_input.run_id)
+    # The GapAnalyzer runs real fixture backtests and issues a real host receipt
+    # for the same exact Planning candidate, rather than bypassing the gate.
+    request = request.model_copy(update={"candidate_specification_ref": scan_input.candidate_ref})
+    outcome = service.host.run_structural_gap_analysis(request, walking_skeleton_runner=runner)
+    assert outcome.completion_receipt_ref is not None
+    exact = scan_input.model_copy(
+        update={"gap_result_ref": outcome.result_ref, "gap_receipt_ref": outcome.completion_receipt_ref}
+    )
+    monkeypatch.setattr(mvp.api, "service", service)
+    monkeypatch.delenv("ONESHOT_OPERATOR_TOKEN", raising=False)
+    response = TestClient(mvp.api.app).post(
+        f"/api/tasks/{task_id}/scanner", json=exact.model_dump(mode="json")
+    )
+    assert response.status_code == 200
+    scan = response.json()
+    assert scan["outcome"] == "blocked"
+    assert scan["findings"] and scan["request_id"].startswith("scanner-")
+    assert service.events(task_id)[-1]["type"] == "scanner_completed"
+
+
+def test_duplicate_requested_capability_is_rejected(tmp_path, monkeypatch):
+    import mvp.api
+
+    service, task_id, request = prepared_scanner(tmp_path)
+    monkeypatch.setattr(mvp.api, "service", service)
+    payload = request.model_dump(mode="json")
+    payload["capabilities"] = ["dependency_readiness", "dependency_readiness"]
+    response = TestClient(mvp.api.app).post(f"/api/tasks/{task_id}/scanner", json=payload)
+    assert response.status_code == 422
+    assert not [e for e in service.events(task_id) if e["type"].startswith("scanner_")]

@@ -6,6 +6,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
+import pytest
+
 import agent.contracts.validation.planning as planning
 from agent.contracts.scanner import ScannerOutcome
 from agent.runtime.authorization import Capability
@@ -51,6 +53,11 @@ def test_host_emits_durable_check_trace_findings_cache_and_result(tmp_path, monk
     assert "scanner_cache_metrics" in types
     assert types[-1] == "scanner_completed"
     assert all(event["detail"]["scan_id"] == scan.request_id for event in observed)
+    executed = next(event["detail"] for event in observed if event["type"] == "scanner_check")
+    assert executed["operator"] == "equals"
+    assert executed["rule_version"] == "2" and executed["scanner_version"] == "2"
+    assert executed["observed_value"] is not None and executed["expected_value"] is not None
+    assert executed["evidence_refs"] and "threshold" not in executed
     assert [event["sequence"] for event in observed] == sorted(event["sequence"] for event in observed)
     assert any(
         event["detail"]["criterion_result"] == "not_satisfied" for event in observed if event["type"] == "scanner_check"
@@ -165,3 +172,100 @@ def test_check_events_are_persisted_while_detector_is_still_executing(tmp_path, 
         result = future.result(timeout=10)
     assert result.outcome is ScannerOutcome.BLOCKED
     assert host.event_store.list(record.task_id)[-1]["event_type"] == "scanner_completed"
+
+
+
+def test_graph_uniqueness_cycle_and_unknown_evidence_are_independent(tmp_path):
+    from pydantic import BaseModel
+
+    from agent.contracts.scanner import CriterionResult, CriterionValidity
+    from agent.runtime.scanner_gateway import ScannerGateway
+
+    class Graph(BaseModel):
+        actions: list[dict[str, object]]
+
+    cases = (
+        ("self", [("a", ("a",))], "cyclic-dependency:graph", "dependency_acyclic"),
+        ("cycle", [("a", ("b",)), ("b", ("a",))], "cyclic-dependency:graph", "dependency_acyclic"),
+        ("duplicate", [("a", ()), ("a", ())], "duplicate-action:a", "dependency_unique_ids"),
+    )
+    gateway = ScannerGateway(HostController(tmp_path).artifact_store)
+    for label, graph, finding_id, check_id in cases:
+        digest = gateway._artifact_store.put_immutable(
+            Graph(actions=[{"action_id": action, "depends_on": list(deps)} for action, deps in graph]),
+            label, 1, "planning", "1.0",
+        )
+        scan = gateway.scan_exact(artifact_ref(label, 1, digest), "repo", ("dependency_readiness",))
+        assert scan.outcome is ScannerOutcome.BLOCKED
+        assert finding_id in {finding.finding_id for finding in scan.findings}
+        assert any(
+            step.check_id == check_id and step.criterion_result is CriterionResult.NOT_SATISFIED
+            and step.criterion_validity is CriterionValidity.NOT_VALID
+            for step in scan.trace_steps
+        )
+
+
+def test_event_persistence_failure_blocks_scan_and_listener_failure_does_not(tmp_path, monkeypatch):
+    from agent.runtime.scanner_gateway import ScannerGatewayError
+
+    host = HostController(tmp_path)
+    record = make_planning_record()
+    digest = host.artifact_store.put_immutable(record, "event-draft", 1, "planning", "1.0")
+    ref = artifact_ref("event-draft", 1, digest)
+    monkeypatch.setattr(host, "_verify_structural_gap", lambda *args: None)
+
+    # Optional output observers have no authority to change a verified scan.
+    result = host.scan_planning_candidate(
+        record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None,
+        on_event=lambda event: (_ for _ in ()).throw(OSError("observer disconnected")),
+    )
+    assert host.artifact_store.get_verified(result.request_id, 1)
+    assert host.event_store.list(record.task_id)[-1]["event_type"] == "scanner_completed"
+
+    original_append = host.event_store.append
+
+    def failure(task_id, event_type, event_data):
+        if event_type == "scanner_check":
+            raise OSError("durable event store unavailable")
+        return original_append(task_id, event_type, event_data)
+
+    monkeypatch.setattr(host.event_store, "append", failure)
+    with pytest.raises(ScannerGatewayError):
+        host.scan_planning_candidate(
+            record.task_id, record.run_id, ref, "repo", ("dependency_readiness",), None, None
+        )
+    events = host.event_store.list(record.task_id)
+    assert events[-1]["event_type"] == "scanner_interrupted"
+    assert not any(event["event_type"] == "scanner_completed" for event in events[-2:])
+
+
+def test_unexecuted_supported_capability_is_not_marked_checked(tmp_path):
+    from pydantic import BaseModel
+
+    from agent.runtime.scanner_gateway import ScannerGateway
+
+    class Graph(BaseModel):
+        actions: list[dict[str, object]]
+
+    host = HostController(tmp_path)
+    digest = host.artifact_store.put_immutable(
+        Graph(actions=[{"action_id": "a", "depends_on": []}]), "mixed-cap", 1, "planning", "1.0"
+    )
+    gateway = ScannerGateway(host.artifact_store)
+    gateway.register_detector("syntax", lambda _: ())
+    result = gateway.scan_exact(artifact_ref("mixed-cap", 1, digest), "repo", ("syntax", "not_registered"))
+    assert result.outcome is ScannerOutcome.BLOCKED
+    assert result.capabilities_checked == ()
+    assert result.capabilities_not_checked == ("syntax", "not_registered")
+
+
+def test_event_store_cursor_pages_are_contiguous_and_bounded(tmp_path):
+    host = HostController(tmp_path)
+    for index in range(275):
+        host.event_store.append("paged-task", "scanner_check", f"check-{index}")
+    first = host.event_store.list("paged-task", after=0, limit=256)
+    second = host.event_store.list("paged-task", after=first[-1]["seq"], limit=256)
+    assert len(first) == 256
+    assert len(second) == 19
+    assert [event["seq"] for event in first + second] == list(range(1, 276))
+    assert host.event_store.list("paged-task", after=second[-1]["seq"], limit=256) == []

@@ -147,6 +147,17 @@ class ScannerGateway:
                     criterion_result=step.criterion_result.value,
                     criterion_validity=step.criterion_validity.value,
                     required=step.required,
+                    observed_value=step.observed_value
+                    if isinstance(step.observed_value, (bool, int, float))
+                    else None,
+                    expected_value=step.expected_value
+                    if isinstance(step.expected_value, (bool, int, float))
+                    else None,
+                    operator=step.operator,
+                    rule_version=step.rule_version,
+                    scanner_version=step.scanner_version,
+                    evidence_refs=list(step.evidence_refs),
+                    **({"threshold": step.threshold} if step.threshold is not None else {}),
                 )
             for request in requests:
                 publish(
