@@ -205,13 +205,18 @@ def scan_plan_draft(
         for rid in action.requirement_ids:
             if rid not in accepted:
                 add(
-                    "unauthorized_scope", "blocking", f"plan.actions.{action.action_id}",
-                    f"action refers to an unaccepted requirement: {rid}", requirement=str(rid),
+                    "unauthorized_scope",
+                    "blocking",
+                    f"plan.actions.{action.action_id}",
+                    f"action refers to an unaccepted requirement: {rid}",
+                    requirement=str(rid),
                     evidence=f"{source_id}:accepted_requirements",
                 )
         if path not in allowed:
             add(
-                "unauthorized_scope", "blocking", f"plan.actions.{action.action_id}",
+                "unauthorized_scope",
+                "blocking",
+                f"plan.actions.{action.action_id}",
                 f"action targets a path outside authorized scope: {path}",
                 requirement=str(action.requirement_ids[0]),
                 evidence=f"{source_id}:allowed_paths",
@@ -230,24 +235,30 @@ def scan_plan_draft(
                 )
             elif sha256(content.encode("utf-8")).hexdigest() != getattr(action, "expected_source_digest", None):
                 add(
-                    "source_drift", "blocking", f"plan.actions.{action.action_id}",
-                    f"source digest mismatch: {path}", requirement=str(action.requirement_ids[0]),
+                    "source_drift",
+                    "blocking",
+                    f"plan.actions.{action.action_id}",
+                    f"source digest mismatch: {path}",
+                    requirement=str(action.requirement_ids[0]),
                     evidence=f"{source_id}:{path}",
                 )
         elif kind == "create" and path in source_files:
             add(
-                "invalid_action_target", "blocking", f"plan.actions.{action.action_id}",
-                f"create target already exists: {path}", requirement=str(action.requirement_ids[0]),
+                "invalid_action_target",
+                "blocking",
+                f"plan.actions.{action.action_id}",
+                f"create target already exists: {path}",
+                requirement=str(action.requirement_ids[0]),
             )
 
     for path, related in by_path.items():
         if len(related) < 2:
             continue
-        if any(a.action_kind == "remove" for a in related) and any(
-            a.action_kind != "remove" for a in related
-        ):
+        if any(a.action_kind == "remove" for a in related) and any(a.action_kind != "remove" for a in related):
             add(
-                "conflicting_file_actions", "blocking", f"plan.actions.{path}",
+                "conflicting_file_actions",
+                "blocking",
+                f"plan.actions.{path}",
                 f"remove and non-remove actions target the same file: {path}",
                 evidence=f"{source_id}:{path}",
             )
@@ -262,27 +273,33 @@ def scan_plan_draft(
             )
             if not covered:
                 add(
-                    "missing_requirement_coverage", "blocking", f"plan.requirements.{rid}",
+                    "missing_requirement_coverage",
+                    "blocking",
+                    f"plan.requirements.{rid}",
                     "accepted requirement has neither planned action nor source-backed coverage",
-                    requirement=rid, evidence=f"{source_id}:accepted_requirements",
+                    requirement=rid,
+                    evidence=f"{source_id}:accepted_requirements",
                 )
 
     criteria = required_criteria or {}
     for rid, criterion_ids in criteria.items():
         for cid in criterion_ids:
-            linked = [
-                a for a in actions if rid in a.requirement_ids and cid in a.acceptance_criteria_ids
-            ]
+            linked = [a for a in actions if rid in a.requirement_ids and cid in a.acceptance_criteria_ids]
             covered = any(
-                c.requirement_id == rid and c.criterion_id == cid
-                and c.status == "covered" and bool(c.validation_step_refs)
+                c.requirement_id == rid
+                and c.criterion_id == cid
+                and c.status == "covered"
+                and bool(c.validation_step_refs)
                 for c in candidate.build_spec.criterion_coverage
             )
             if not (covered or any(a.validation_steps for a in linked)):
                 add(
-                    "missing_acceptance_check", "blocking", f"plan.criteria.{cid}",
+                    "missing_acceptance_check",
+                    "blocking",
+                    f"plan.criteria.{cid}",
                     "accepted criterion has no planned validation step",
-                    requirement=rid, evidence=f"{source_id}:success_criteria",
+                    requirement=rid,
+                    evidence=f"{source_id}:success_criteria",
                 )
 
     return tuple(findings)
@@ -344,6 +361,7 @@ def repair_plan_draft(
         raise ValueError("repair leaves an invalid dependency graph")
     return result
 
+
 def plan_structure_detector(
     source_files: Mapping[str, str],
     *,
@@ -354,6 +372,7 @@ def plan_structure_detector(
     source_snapshot_complete: bool = False,
 ) -> Callable[[bytes], tuple[ScannerFinding, ...]]:
     """Adapt the existing ScannerGateway detector API without another runtime."""
+
     def detect(candidate_bytes: bytes) -> tuple[ScannerFinding, ...]:
         candidate = CandidateSpecification.model_validate_json(candidate_bytes)
         return scan_plan_draft(
