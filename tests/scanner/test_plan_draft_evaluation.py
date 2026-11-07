@@ -113,13 +113,15 @@ def test_matched_multifile_chain_and_missing_dependency_edge():
 def test_existing_satisfied_requirement_needs_no_redundant_action():
     sufficient = candidate(
         modify(),
-        coverage=(RequirementCoverage(
-            requirement_id="REQ-2",
-            status="covered",
-            criterion_refs=("C2",),
-            specification_refs=("app/existing.py",),
-            reason="verified in pinned source",
-        ),),
+        coverage=(
+            RequirementCoverage(
+                requirement_id="REQ-2",
+                status="covered",
+                criterion_refs=("C2",),
+                specification_refs=("app/existing.py",),
+                reason="verified in pinned source",
+            ),
+        ),
     )
     defective = candidate(modify())
     assert scan(sufficient, accepted=("REQ-1", "REQ-2")) == ()
@@ -188,12 +190,14 @@ def test_repair_is_separate_new_draft_revision_and_rescan():
     assert categories(scan(defective)) == {"invalid_action_target"}
     repaired = repair_plan_draft(
         defective,
-        (DraftRepair(
-            action_id="A1",
-            kind="restore_source_path",
-            source_path="app/main.py",
-            evidence_ref="fixture:pinned-source:app/main.py",
-        ),),
+        (
+            DraftRepair(
+                action_id="A1",
+                kind="restore_source_path",
+                source_path="app/main.py",
+                evidence_ref="fixture:pinned-source:app/main.py",
+            ),
+        ),
         FILES,
         allowed_paths=ALLOWED,
     )
@@ -209,12 +213,14 @@ def test_repair_refuses_unverified_or_unauthorized_source():
     with pytest.raises(ValueError, match="authorized evidence"):
         repair_plan_draft(
             defective,
-            (DraftRepair(
-                action_id="A1",
-                kind="restore_source_path",
-                source_path="external/private.py",
-                evidence_ref="unverified",
-            ),),
+            (
+                DraftRepair(
+                    action_id="A1",
+                    kind="restore_source_path",
+                    source_path="external/private.py",
+                    evidence_ref="unverified",
+                ),
+            ),
             FILES,
             allowed_paths=ALLOWED,
         )
@@ -225,12 +231,14 @@ def test_repair_dependency_then_rescan_without_source_change():
     assert "dependency_order" in categories(scan(original))
     repaired = repair_plan_draft(
         original,
-        (DraftRepair(
-            action_id="A2",
-            kind="set_dependencies",
-            dependencies=("A1",),
-            evidence_ref="fixture:dependency-trace",
-        ),),
+        (
+            DraftRepair(
+                action_id="A2",
+                kind="set_dependencies",
+                dependencies=("A1",),
+                evidence_ref="fixture:dependency-trace",
+            ),
+        ),
         FILES,
         allowed_paths=ALLOWED,
     )
