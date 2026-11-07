@@ -27,7 +27,6 @@ from agent.contracts.validation.planning import (
 from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.scanner_gateway import ScannerGateway
 
-
 SOURCE = "def normalize(value):\n    return value\n"
 OTHER = "def existing_feature():\n    return True\n"
 FILES = {"app/main.py": SOURCE, "app/existing.py": OTHER}
