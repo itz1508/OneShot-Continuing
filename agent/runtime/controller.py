@@ -14,6 +14,7 @@ from agent.contracts.common import ArtifactRef
 from agent.contracts.host import HostDispatchEnvelope, HostDispatchResult, ReceiptRef
 from agent.contracts.planning import PlanningRecord
 from agent.contracts.scanner import CriterionResult, ScannerOutcome, ScannerResult
+from agent.contracts.validation.planning import validate_action_graph
 from agent.contracts.work_todo import TodoList, WorkBinding
 from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.authorization import AuthorizationEngine, Capability
@@ -369,6 +370,17 @@ class HostController:
                 original_action["depends_on"] = proposed_action["depends_on"]
         if not changed_actions:
             raise TransitionError("repair proposal contains no authorized changes")
+        action_ids = {item["action_id"] for item in before_actions}
+        for original_action, proposed_action in zip(
+            original.candidate.build_spec.actions, proposed_record.candidate.build_spec.actions, strict=True
+        ):
+            if original_action.action_id not in changed_actions:
+                continue
+            existing_valid = set(original_action.depends_on) & action_ids
+            if not existing_valid.issubset(set(proposed_action.depends_on)):
+                raise TransitionError("repair removes an existing valid dependency")
+        if validate_action_graph(proposed_record.candidate.build_spec):
+            raise TransitionError("repair introduces an invalid dependency graph")
         before["stage_revision"] = after["stage_revision"]
         before["candidate"]["specification_revision"] = after["candidate"]["specification_revision"]
         if before != after:
