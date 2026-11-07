@@ -2,6 +2,19 @@
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from time import perf_counter_ns
+
+from agent.contracts.scanner import (
+    CriterionResult,
+    CriterionValidity,
+    ObservationState,
+    ScannerFinding,
+    ScannerTraceStep,
+    TracedDetectorResult,
+)
+
 from agent.contracts.planning import (
     BuildSpecification,
     PlanningRecord,
@@ -114,3 +127,93 @@ def validate_paths(spec: BuildSpecification) -> list[str]:
                 errors.append(f"path collision: {path} in actions {paths[path]} and {action.action_id}")
             paths[path] = action.action_id
     return errors
+
+
+# Bounded pure parsing: no evidence, authorization, timing or traces are cached.
+DEPENDENCY_PARSER_VERSION = "1"
+DEPENDENCY_RULE_VERSION = "1"
+DEPENDENCY_SCANNER_VERSION = "1"
+MAX_CACHED_SOURCE_BYTES = 262_144
+
+
+@lru_cache(maxsize=128)
+def parse_action_dependency_facts(
+    parser_version: str, source_bytes: bytes
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Extract immutable action/dependency facts from exact candidate bytes."""
+    if not parser_version:
+        raise ValueError("parser version required")
+    data = json.loads(source_bytes)
+    if "candidate" in data:
+        data = data["candidate"]
+    if "build_spec" in data:
+        data = data["build_spec"]
+    actions = data["actions"]
+    if not isinstance(actions, list):
+        raise ValueError("actions must be an array")
+    facts: list[tuple[str, tuple[str, ...]]] = []
+    for action in actions:
+        action_id = action["action_id"]
+        dependencies = action.get("depends_on", [])
+        if not isinstance(action_id, str) or not action_id:
+            raise ValueError("invalid action ID")
+        if not isinstance(dependencies, list) or any(not isinstance(dep, str) for dep in dependencies):
+            raise ValueError("invalid dependency list")
+        facts.append((action_id, tuple(dependencies)))
+    return tuple(facts)
+
+
+def scan_action_dependencies(source_bytes: bytes, target_ref: str, evidence_ref: str) -> TracedDetectorResult:
+    """Emit actual dependency membership comparisons, not generated explanations."""
+    before = parse_action_dependency_facts.cache_info()
+    started = perf_counter_ns()
+    # Oversized inputs are analyzed but not retained in the bounded cache.
+    if len(source_bytes) <= MAX_CACHED_SOURCE_BYTES:
+        facts = parse_action_dependency_facts(DEPENDENCY_PARSER_VERSION, source_bytes)
+    else:
+        facts = parse_action_dependency_facts.__wrapped__(DEPENDENCY_PARSER_VERSION, source_bytes)
+    duration = perf_counter_ns() - started
+    after = parse_action_dependency_facts.cache_info()
+    known_ids = {action_id for action_id, _ in facts}
+    traces: list[ScannerTraceStep] = []
+    findings: list[ScannerFinding] = []
+    for action_id, dependencies in facts:
+        # An empty dependency set is a known, vacuously satisfied observation.
+        for dependency in dependencies or ("",):
+            observed = not dependency or dependency in known_ids
+            traces.append(
+                ScannerTraceStep(
+                    check_id="dependency_readiness",
+                    rule_version=DEPENDENCY_RULE_VERSION,
+                    scanner_version=DEPENDENCY_SCANNER_VERSION,
+                    target_ref=f"{target_ref}:action:{action_id}",
+                    observation_state=ObservationState.KNOWN,
+                    observed_value=bool(observed),
+                    operator="equals",
+                    expected_value=True,
+                    criterion_result=CriterionResult.SATISFIED if observed else CriterionResult.NOT_SATISFIED,
+                    criterion_validity=CriterionValidity.VALID if observed else CriterionValidity.NOT_VALID,
+                    evidence_refs=(evidence_ref,),
+                    reason="No dependencies declared" if not dependency else f"Dependency reference: {dependency}",
+                )
+            )
+            if not observed:
+                findings.append(
+                    ScannerFinding(
+                        finding_id=f"missing-dependency:{action_id}:{dependency}",
+                        capability="dependency_readiness",
+                        severity="error",
+                        message=f"Action {action_id} references absent action {dependency}",
+                        location=f"action:{action_id}",
+                        evidence_ref=evidence_ref,
+                    )
+                )
+    if not facts:
+        raise ValueError("candidate has no actions to validate")
+    return TracedDetectorResult(
+        findings=tuple(findings),
+        trace_steps=tuple(traces),
+        cache_hits=after.hits - before.hits,
+        cache_misses=after.misses - before.misses,
+        parse_duration_ns=duration,
+    )
