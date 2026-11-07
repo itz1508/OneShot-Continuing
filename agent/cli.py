@@ -142,7 +142,10 @@ def main() -> int:
     """Main CLI entrypoint."""
     if len(sys.argv) < 2:
         print("Usage: python -m agent <command> [args]")
-        print("Commands: doctor, run <existing-task-id>, scan <task-id> <request.json> [--state-root PATH], status, resume, verify")
+        print(
+            "Commands: doctor, run <existing-task-id>, scan <task-id> <request.json> "
+            "[--state-root PATH], status, resume, verify"
+        )
         return 1
 
     cmd = sys.argv[1]

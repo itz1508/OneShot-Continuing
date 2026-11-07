@@ -255,7 +255,10 @@ class ScannerGateway:
                     traces.extend(unresolved.trace_steps)
                     evidence_requests.extend(unresolved.evidence_requests)
                     report(cap, unresolved.trace_steps, unresolved.evidence_requests, ())
-                publish("scanner_capability", f"{cap}: detector could not check evidence", capability=cap, status="not_checked")
+                publish(
+                    "scanner_capability", f"{cap}: detector could not check evidence",
+                    capability=cap, status="not_checked",
+                )
                 continue
             checked.append(cap)
             all_findings.extend(findings)
