@@ -8,13 +8,13 @@ from typing import Literal
 
 from pydantic import Field
 
+from agent.contracts.common import ContractModel
 from agent.contracts.planning import (
     BuildAction,
     BuildSpecification,
     CandidateSpecification,
     PlanningRecord,
 )
-from agent.contracts.common import ContractModel
 from agent.contracts.scanner import ScannerFinding
 
 
@@ -187,7 +187,6 @@ def scan_plan_draft(
             )
         )
 
-    ids = {a.action_id for a in actions}
     for msg in validate_action_graph(candidate.build_spec):
         add("dependency_order", "blocking", "plan.actions", msg)
 
