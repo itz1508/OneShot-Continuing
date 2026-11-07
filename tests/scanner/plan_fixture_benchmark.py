@@ -228,7 +228,7 @@ def run() -> dict[str, Any]:
         "summary": {
             split: score(records, split) for split in ("development", "held_out")
         }
-        | {"all": score(records, "development") if False else score_all(records)},
+        | {"all": score_all(records)},
         "records": records,
     }
 
