@@ -205,6 +205,7 @@ def test_repair_is_separate_new_draft_revision_and_rescan():
         ),
         FILES,
         allowed_paths=ALLOWED,
+        verified_evidence_refs=("fixture:pinned-source:app/main.py",),
     )
     assert repaired.specification_revision == 2
     assert defective.specification_revision == 1
@@ -228,6 +229,7 @@ def test_repair_refuses_unverified_or_unauthorized_source():
             ),
             FILES,
             allowed_paths=ALLOWED,
+            verified_evidence_refs=("unverified",),
         )
 
 
@@ -246,6 +248,7 @@ def test_repair_dependency_then_rescan_without_source_change():
         ),
         FILES,
         allowed_paths=ALLOWED,
+        verified_evidence_refs=("fixture:dependency-trace",),
     )
     assert scan(repaired) == ()
     assert original.build_spec.actions[1].depends_on == ("missing",)
@@ -317,3 +320,23 @@ def test_unsupported_assumption_does_not_become_verified_by_self_claim():
 
     observed = scan(plan, verified_evidence_refs=("research:provider-schema",))
     assert observed == ()
+
+
+
+def test_plan_repair_rejects_fabricated_evidence_reference():
+    defective = candidate(modify(path="app/missing.py"))
+    with pytest.raises(ValueError, match="not independently verified"):
+        repair_plan_draft(
+            defective,
+            (
+                DraftRepair(
+                    action_id="A1",
+                    kind="restore_source_path",
+                    source_path="app/main.py",
+                    evidence_ref="fixture:invented-source-ref",
+                ),
+            ),
+            FILES,
+            allowed_paths=ALLOWED,
+            verified_evidence_refs=("fixture:pinned-source:app/main.py",),
+        )
