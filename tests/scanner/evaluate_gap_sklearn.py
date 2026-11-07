@@ -45,7 +45,7 @@ CASES = (
     Case("clear_independent", "clear", (("a", ()), ("b", ()))),
     Case("clear_chain", "clear", (("a", ()), ("b", ("a",)), ("c", ("b",)))),
     Case("clear_diamond", "clear", (("a", ()), ("b", ("a",)), ("c", ("a",)), ("d", ("b", "c")))),
-    Case("clear_long_chain", "clear", tuple((f"a{i}", (f"a{i-1}",) if i else ()) for i in range(40))),
+    Case("clear_long_chain", "clear", tuple((f"a{i}", (f"a{i - 1}",) if i else ()) for i in range(40))),
     Case("missing_single", "defect", (("a", ()), ("b", ("missing",)))),
     Case("missing_multiple", "defect", (("a", ("x", "y")), ("b", ()))),
     Case("missing_mixed", "defect", (("a", ()), ("b", ("a", "missing")))),
@@ -119,8 +119,7 @@ def main() -> int:
     mismatches = [details for predicted, details in observations if predicted != details["expected"]]
     # Classification must also expose structural false claims, not only headline labels.
     incorrect_checked = [
-        details for _, details in observations
-        if details["case"] == "unsupported_capability" and details["checked"]
+        details for _, details in observations if details["case"] == "unsupported_capability" and details["checked"]
     ]
     payload = {
         "evaluation": "fixture_only_not_build_probability",
