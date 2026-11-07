@@ -56,6 +56,11 @@ def validate_refactors(record: PlanningRecord) -> list[str]:
     return errors
 
 
+def _dependency_exists(dependency_id: str, action_ids: set[str]) -> bool:
+    """Shared observed predicate for legacy validation and emitted traces."""
+    return dependency_id in action_ids
+
+
 def validate_action_graph(spec: BuildSpecification) -> list[str]:
     errors: list[str] = []
     action_ids = [a.action_id for a in spec.actions]
@@ -64,7 +69,7 @@ def validate_action_graph(spec: BuildSpecification) -> list[str]:
     id_set = set(action_ids)
     for action in spec.actions:
         for dep in action.depends_on:
-            if dep not in id_set:
+            if not _dependency_exists(dep, id_set):
                 errors.append(f"action {action.action_id} depends on unknown action {dep}")
     # Check for cycles (simple DFS)
     visited: set[str] = set()
@@ -177,7 +182,7 @@ def scan_action_dependencies(source_bytes: bytes, target_ref: str, evidence_ref:
     for action_id, dependencies in facts:
         # An empty dependency set is a known, vacuously satisfied observation.
         for dependency in dependencies or ("",):
-            observed = not dependency or dependency in known_ids
+            observed = not dependency or _dependency_exists(dependency, known_ids)
             traces.append(
                 ScannerTraceStep(
                     check_id="dependency_readiness",
