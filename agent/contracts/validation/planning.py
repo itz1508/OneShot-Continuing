@@ -145,6 +145,7 @@ def scan_plan_draft(
     allowed_paths: tuple[str, ...],
     required_criteria: Mapping[str, tuple[str, ...]] | None = None,
     source_snapshot_complete: bool = False,
+    verified_evidence_refs: tuple[str, ...] = (),
 ) -> tuple[ScannerFinding, ...]:
     """Read-only structural inspection of one draft; source_files are pinned evidence.
 
@@ -302,6 +303,40 @@ def scan_plan_draft(
                     evidence=f"{source_id}:success_criteria",
                 )
 
+    verified = set(verified_evidence_refs)
+    for assumption in candidate.build_spec.assumptions:
+        loc = f"plan.assumptions.{assumption.assumption_id}"
+        requirement = str(assumption.requirement_id)
+        if assumption.status == "supported":
+            if not assumption.evidence_refs or not set(assumption.evidence_refs).issubset(verified):
+                add(
+                    "unsupported_evidence_claim",
+                    "blocking",
+                    loc,
+                    "assumption claims verification without independently verified evidence",
+                    requirement=requirement,
+                    evidence=f"{source_id}:verified_evidence_refs",
+                )
+        elif assumption.status == "contradicted":
+            add(
+                "contradicted_assumption",
+                "blocking",
+                loc,
+                "planning assumption is contradicted",
+                requirement=requirement,
+                evidence=f"{source_id}:assumptions",
+            )
+        else:
+            add(
+                "unresolved_assumption",
+                "uncertainty",
+                loc,
+                "assumption remains unverified; preserve its later-check owner",
+                requirement=requirement,
+                owner=assumption.verification_stage or "Planning",
+                evidence=f"{source_id}:assumptions",
+            )
+
     return tuple(findings)
 
 
@@ -370,6 +405,7 @@ def plan_structure_detector(
     allowed_paths: tuple[str, ...],
     required_criteria: Mapping[str, tuple[str, ...]] | None = None,
     source_snapshot_complete: bool = False,
+    verified_evidence_refs: tuple[str, ...] = (),
 ) -> Callable[[bytes], tuple[ScannerFinding, ...]]:
     """Adapt the existing ScannerGateway detector API without another runtime."""
 
@@ -383,6 +419,7 @@ def plan_structure_detector(
             allowed_paths=allowed_paths,
             required_criteria=required_criteria,
             source_snapshot_complete=source_snapshot_complete,
+            verified_evidence_refs=verified_evidence_refs,
         )
 
     return detect
