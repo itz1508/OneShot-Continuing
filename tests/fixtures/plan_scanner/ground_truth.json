@@ -1,0 +1,372 @@
+{
+  "ground_truth": {
+    "case_01": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.file_actions[0].path",
+      "evidence_location": "source_snapshot/app/url.py; plan.file_actions[A1].path",
+      "ground_truth_rationale": "Target does not exist, while REQ-1 points to app/url.py and no create operation is planned",
+      "must_preserve": "Requirement, check, existing source",
+      "repair_boundary": "Restore A1.path to app/url.py using snapshot identity",
+      "scenario": "Single-file target",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "invalid_action_target",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        }
+      }
+    },
+    "case_02": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T2/T3",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.tasks[2].depends_on + plan.file_actions[2].depends_on",
+      "evidence_location": "plan.tasks[T2,T3]; plan.file_actions[A2,A3]",
+      "ground_truth_rationale": "API can be built before verify_token exists despite an explicit required upstream interface",
+      "must_preserve": "Source, API contract, acceptance check",
+      "repair_boundary": "Restore T3\u2192T2 and A3\u2192A2 dependency edges",
+      "scenario": "Multi-file dependency chain",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "dependency_order",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": []
+        }
+      }
+    },
+    "case_03": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.file_actions + plan.tasks",
+      "evidence_location": "source_snapshot/app/http.py; plan.file_actions[A1]",
+      "ground_truth_rationale": "Header requirement is satisfied; removing user.py has no traceable dependency or authorization",
+      "must_preserve": "Existing header, existing user.py, verification task",
+      "repair_boundary": "Remove A1 and T2 from the draft plan",
+      "scenario": "Already-satisfied requirement",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "extra_unjustified_action",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        }
+      }
+    },
+    "case_04": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.file_actions + plan.tasks",
+      "evidence_location": "source_snapshot/pyproject.toml; plan.file_actions[A1,A2]",
+      "ground_truth_rationale": "httpx is absent and no remaining plan action installs or locks it",
+      "must_preserve": "Existing requirements, source, checks",
+      "repair_boundary": "Restore authorized dependency installation and ordering",
+      "scenario": "Missing package dependency",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "missing_dependency_resolution",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": []
+        }
+      }
+    },
+    "case_05": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.tasks depends_on + plan.file_actions[1].depends_on",
+      "evidence_location": "plan.tasks[T1,T2]; plan.file_actions[A1,A2]",
+      "ground_truth_rationale": "Dependency addition is authorized but is scheduled after the code that requires it",
+      "must_preserve": "Dependency specification, paths, acceptance criteria",
+      "repair_boundary": "Restore T1 before T2 with matching file-action dependency",
+      "scenario": "Dependency supplied by plan",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "dependency_order",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        }
+      }
+    },
+    "case_06": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T2/T3",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.file_actions + plan.tasks",
+      "evidence_location": "plan.file_actions[A1,A2]",
+      "ground_truth_rationale": "Modify and remove target same file with irreconcilable outcomes; requirement requires file retained",
+      "must_preserve": "Timeout change A1, file identity, acceptance check",
+      "repair_boundary": "Remove A2 and T2",
+      "scenario": "Conflicting file actions",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "conflicting_file_actions",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": []
+        }
+      }
+    },
+    "case_07": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.acceptance_checks",
+      "evidence_location": "accepted_requirements[REQ-1]; plan.acceptance_checks",
+      "ground_truth_rationale": "TTL behavior has no planned observable test or evidence criterion",
+      "must_preserve": "TTL requirement and source modification",
+      "repair_boundary": "Restore TTL expiry check with controlled clock",
+      "scenario": "Missing acceptance check",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "missing_acceptance_check",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        }
+      }
+    },
+    "case_08": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T2/T3",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.file_actions + plan.tasks",
+      "evidence_location": "scope.allowed_paths; plan.file_actions[A2]",
+      "ground_truth_rationale": "Users module is outside confirmed scope and unrelated to ordered report export",
+      "must_preserve": "Allowed report behavior, scope boundary",
+      "repair_boundary": "Remove unauthorized action and task; do not request silent scope expansion",
+      "scenario": "Unsupported scope addition",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "unauthorized_scope",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": []
+        }
+      }
+    },
+    "case_09": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.assumptions",
+      "evidence_location": "source_snapshot/docs/provider.md; plan.assumptions",
+      "ground_truth_rationale": "Snapshot contains no event schema; changing unknown to verified invents provider evidence",
+      "must_preserve": "Actual provider contract unknown, functional intent, accepted scope",
+      "repair_boundary": "Restore unknown status, Research owner, and mandatory resolution before T1; do not invent a schema",
+      "scenario": "Unknown evidence integrity",
+      "split": "development",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "unresolved_assumption",
+              "disposition": "carry_to_later_check",
+              "owner_stage": "Research"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "unsupported_evidence_claim",
+              "disposition": "uncertainty_requires_resolution",
+              "owner_stage": "Research"
+            }
+          ]
+        }
+      }
+    },
+    "case_10": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.tasks[0].description",
+      "evidence_location": "plan.tasks[T1].description",
+      "ground_truth_rationale": "A typo in human-readable description does not change action path, interface, dependency, or acceptance behavior",
+      "must_preserve": "Task action, requirement, and test unchanged",
+      "repair_boundary": "No action required",
+      "scenario": "Benign grammar variation",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": []
+        }
+      }
+    },
+    "case_11": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "a",
+      "changed_variant": "b",
+      "controlled_change": "plan.file_actions[0].detail",
+      "evidence_location": "source_snapshot/app/renderer.py:1; plan.file_actions[A1].detail",
+      "ground_truth_rationale": "Source exports render_card singular; requested render_cards import cannot resolve",
+      "must_preserve": "No source export rename, accepted behavior, test",
+      "repair_boundary": "Update A1 to import render_card, preserving the existing exported interface",
+      "scenario": "Import name mismatch",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": false,
+          "expected_findings": []
+        },
+        "b": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "interface_symbol_mismatch",
+              "disposition": "blocking",
+              "owner_stage": "Planning"
+            }
+          ]
+        }
+      }
+    },
+    "case_12": {
+      "affected_requirement": "REQ-1",
+      "affected_task": "T1",
+      "base_variant": "b",
+      "changed_variant": "a",
+      "controlled_change": "plan.assumptions",
+      "evidence_location": "source_snapshot/docs/runtime.md; plan.assumptions",
+      "ground_truth_rationale": "Environment-specific provider connectivity was never tested; asserting verified and removing preflight is unsupported",
+      "must_preserve": "Dependency identity, scope, actual unknown",
+      "repair_boundary": "Restore unknown with explicit Builder Preflight test before use",
+      "scenario": "Later-stage recoverable assumption",
+      "split": "held_out",
+      "variants": {
+        "a": {
+          "actionable_defect": true,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "unsupported_runtime_assumption",
+              "disposition": "uncertainty_requires_resolution",
+              "owner_stage": "Builder Preflight"
+            }
+          ]
+        },
+        "b": {
+          "actionable_defect": false,
+          "expected_findings": [
+            {
+              "affected_requirement": "REQ-1",
+              "category": "unresolved_assumption",
+              "disposition": "carry_to_later_check",
+              "owner_stage": "Builder Preflight"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "schema": "aakr-synthetic-plan-fixtures-v1"
+}

@@ -42,6 +42,11 @@ class ScannerFinding(ContractModel):
     message: str = Field(min_length=1)
     location: str = ""
     evidence_ref: str = ""
+    category: str = ""
+    disposition: str = ""
+    owner_stage: str = ""
+    affected_requirement: str = ""
+    affected_task: str = ""
 
 
 class ScannerResult(ContractModel):

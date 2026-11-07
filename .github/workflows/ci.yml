@@ -29,5 +29,7 @@ jobs:
         run: uv run --no-sync mypy agent
       - name: Validate Modal 1.6.3 ASGI image declaration (no cloud access)
         run: uv run --no-sync --with modal==1.6.3 python -c "import modal_app; assert modal_app.APP_NAME; print('Modal declaration OK')"
+      - name: Plan scanner synthetic fixture evaluation
+        run: uv run --no-sync python tests/scanner/plan_fixture_benchmark.py
       - name: Tests
         run: uv run --no-sync pytest -q

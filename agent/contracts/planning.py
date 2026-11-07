@@ -284,6 +284,17 @@ class CriterionCoverage(ContractModel):
     reason: str = ""
 
 
+class PlanAssumption(ContractModel):
+    """Assumption explicitly recorded by Planning for later verification."""
+
+    assumption_id: str = Field(min_length=1)
+    requirement_id: RequirementId
+    statement: str = Field(min_length=1)
+    status: Literal["unknown", "supported", "contradicted"] = "unknown"
+    evidence_refs: tuple[str, ...] = ()
+    verification_stage: str = ""
+
+
 class BuildSpecification(ContractModel):
     spec_id: str = Field(min_length=1)
     objective: str = Field(min_length=1)
@@ -291,6 +302,7 @@ class BuildSpecification(ContractModel):
     phases: tuple[BuildPhase, ...] = ()
     fixtures: tuple[FixtureSpecification, ...] = ()
     chaos_specs: tuple[ChaosSpecification, ...] = ()
+    assumptions: tuple[PlanAssumption, ...] = ()
     protected_surfaces: tuple[str, ...] = ()
     requirement_coverage: tuple[RequirementCoverage, ...] = ()
     criterion_coverage: tuple[CriterionCoverage, ...] = ()
