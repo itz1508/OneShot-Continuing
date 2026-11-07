@@ -69,10 +69,14 @@ def adapt(case_id: str, item: dict[str, Any]) -> tuple[CandidateSpecification, d
         related_tasks = [task for task in plan["tasks"] if aid in task["action_refs"]]
         if not related_tasks:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no fixture task mapping")
-        requirement_ids = tuple(sorted({canonical_requirement(rid) for task in related_tasks for rid in task["requirement_refs"]}))
+        requirement_ids = tuple(
+            sorted({canonical_requirement(rid) for task in related_tasks for rid in task["requirement_refs"]})
+        )
         if not requirement_ids:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no requirement mapping")
-        relevant_checks = [check for check in checks if canonical_requirement(check["requirement_ref"]) in requirement_ids]
+        relevant_checks = [
+            check for check in checks if canonical_requirement(check["requirement_ref"]) in requirement_ids
+        ]
         if not relevant_checks:
             raise UnrepresentableFixture(f"unrepresentable: action {aid} has no validation check")
         path = row["path"]
@@ -230,6 +234,9 @@ def run() -> dict[str, Any]:
         )
     if len(records) != 24:
         raise ValueError(f"benchmark inventory is incomplete: {len(records)}")
+    unsupported = {row["case_id"] for row in records if row["status"] == "unrepresentable"}
+    if unsupported != {"case_03/a", "case_07/b"}:
+        raise ValueError(f"unexpected adapter coverage: {sorted(unsupported)}")
     return {
         "benchmark": "OneShot synthetic plan scanner fixture v1",
         "scorer": "blocking vs ground_truth.actionable_defect; findings require exact category/disposition/owner",
