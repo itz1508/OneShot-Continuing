@@ -63,8 +63,12 @@ def test_matched_true_false_and_unknown_observations(tmp_path):
     assert all(step.criterion_result is CriterionResult.SATISFIED for step in good.trace_steps)
     assert all(step.criterion_validity is CriterionValidity.VALID for step in good.trace_steps)
     assert all(step.observation_state is ObservationState.KNOWN for step in good.trace_steps)
+    assert all(step.evidence_refs and step.operator == "equals" for step in good.trace_steps)
     assert all(
-        step.evidence_refs and step.operator == "equals" and step.expected_value is True for step in good.trace_steps
+        (type(step.expected_value) is int and step.expected_value == 1)
+        if step.check_id == "dependency_unique_ids"
+        else step.expected_value is True
+        for step in good.trace_steps
     )
 
     bad_payload = payload.model_copy(deep=True)
