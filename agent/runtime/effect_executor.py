@@ -8,7 +8,9 @@ import tempfile
 from pathlib import Path
 
 from agent.contracts.build import BuildActionExecution, BuildActionStatus
+from agent.contracts.build_schedule import BuildWave, VerifiedWaveResult
 from agent.contracts.host import BuildAdmissionReceipt, admission_receipt_subject
+from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.authorization import AuthorizationEngine, AuthorizationError
 from agent.runtime.checkpoint_store import CheckpointStore
 from agent.runtime.receipt_store import ReceiptStore
@@ -50,10 +52,12 @@ class EffectExecutor:
         checkpoint_store: CheckpointStore,
         receipt_store: ReceiptStore,
         workspace_root: str | Path,
+        artifact_store: ArtifactStore | None = None,
     ) -> None:
         self._auth = authorization
         self._checkpoints = checkpoint_store
         self._receipts = receipt_store
+        self._artifacts = artifact_store
         self._workspace = Path(os.path.realpath(str(workspace_root)))
         self._workspace.mkdir(parents=True, exist_ok=True)
 
@@ -103,6 +107,8 @@ class EffectExecutor:
         file_path: str,
         expected_pre: str | None,
         expected_post: str | None,
+        *,
+        target_path: str | None = None,
     ) -> None:
         """Write a durable pre-effect checkpoint to the checkpoint store."""
         checkpoint_data = {
@@ -111,6 +117,7 @@ class EffectExecutor:
             "file_path": file_path,
             "expected_pre_digest": expected_pre,
             "expected_post_digest": expected_post,
+            "target_path": target_path,
         }
         self._checkpoints.checkpoint_cas(
             f"pre-effect-{action_id}",
@@ -141,6 +148,55 @@ class EffectExecutor:
             return state_dict
         return None
 
+    def _verify_wave(self, wave: BuildWave, action_id: str) -> str | None:
+        """Recheck the exact pinned preimages and predecessor receipt at effect time."""
+        if wave.wave_index > 1:
+            if self._artifacts is None or wave.previous_wave_result_ref is None or wave.previous_wave_receipt_ref is None:
+                return "prior wave evidence is unavailable"
+            ref = wave.previous_wave_result_ref
+            receipt = wave.previous_wave_receipt_ref
+            try:
+                if self._artifacts.get_digest(ref.artifact_id, ref.artifact_revision) != ref.artifact_digest:
+                    return "prior wave result digest mismatch"
+                previous = VerifiedWaveResult.model_validate_json(
+                    self._artifacts.get_verified(ref.artifact_id, ref.artifact_revision)
+                )
+                if not previous.accepted or previous.wave_id == wave.wave_id:
+                    return "prior wave is not independently accepted"
+                if not self._receipts.verify(
+                    receipt.receipt_id, receipt.receipt_digest, f"verified_wave:{ref.artifact_digest}"
+                ):
+                    return "prior wave receipt does not bind accepted result"
+                if any(previous.output_digests.get(path) != pre for path, pre in wave.expected_preimages.items()):
+                    return "prior wave outputs do not match next wave preimages"
+            except Exception:
+                return "prior wave evidence could not be verified"
+
+        paths = {
+            path
+            for batch in wave.batches
+            for task in batch.tasks
+            if action_id in task.todo.source_action_ids
+            for path in task.todo.authorized_paths
+        }
+        observed: dict[str, str | None] = {}
+        for path in paths:
+            checked = self._check_containment(path, action_id)
+            if checked is None:
+                return "wave preimage path escapes workspace"
+            actual = Path(checked)
+            if actual.is_symlink() or (actual.exists() and not actual.is_file()):
+                return "wave preimage path is not a normal file"
+            try:
+                observed[path] = hashlib.sha256(actual.read_bytes()).hexdigest() if actual.exists() else None
+            except OSError:
+                return "cannot inspect wave preimage"
+        try:
+            wave.require_action_preimages(action_id, observed)
+        except ValueError:
+            return "action wave preimages changed or action is missing"
+        return None
+
     def execute_admitted(
         self,
         action_id: str,
@@ -150,6 +206,7 @@ class EffectExecutor:
         source_path: str | None = None,
         content: str | None = None,
         expected_source_digest: str | None = None,
+        wave: BuildWave | None = None,
     ) -> BuildActionExecution:
         """Execute a single admitted build action.
 
@@ -201,7 +258,54 @@ class EffectExecutor:
                     error=f"path escapes workspace (containment check failed): {source_path}",
                 )
 
+        if wave is not None:
+            wave_blocker = self._verify_wave(wave, action_id)
+            if wave_blocker is not None:
+                return BuildActionExecution(
+                    action_id=action_id, status=BuildActionStatus.BLOCKED, error=wave_blocker
+                )
+
         try:
+            if action_kind == "move" and source_path and target_path:
+                if wave is None or expected_source_digest is None:
+                    return BuildActionExecution(
+                        action_id=action_id,
+                        status=BuildActionStatus.BLOCKED,
+                        error="move requires an admitted wave and exact source digest",
+                    )
+                source = Path(resolved_source)  # type: ignore[arg-type]
+                destination = Path(resolved_target)  # type: ignore[arg-type]
+                if source.is_symlink() or destination.is_symlink() or not source.is_file():
+                    return BuildActionExecution(
+                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        error="move requires a regular source and non-symlink target",
+                    )
+                actual = hashlib.sha256(source.read_bytes()).hexdigest()
+                if actual != expected_source_digest:
+                    return BuildActionExecution(
+                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        error="move source digest changed at effect time",
+                    )
+                # The target must have been pinned absent; never replace a
+                # changed or pre-existing destination with a plan move.
+                if wave.expected_preimages.get(target_path) is not None or destination.exists():
+                    return BuildActionExecution(
+                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        error="move destination is not pinned absent",
+                    )
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                self._pre_effect_checkpoint(
+                    action_id, source_path, actual, actual, target_path=target_path
+                )
+                os.replace(source, destination)
+                self._clear_pre_effect_checkpoint(action_id)
+                return BuildActionExecution(
+                    action_id=action_id,
+                    status=BuildActionStatus.COMPLETED,
+                    pre_image_digest=actual,
+                    post_image_digest=actual,
+                )
+
             if action_kind == "create" and target_path and content is not None:
                 full_path = Path(resolved_target)  # type: ignore[arg-type]
                 full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -328,6 +432,38 @@ class EffectExecutor:
         """
         # Check for durable pre-effect checkpoint
         pre_checkpoint = self._has_pre_effect_checkpoint(action_id)
+        if pre_checkpoint is not None and isinstance(pre_checkpoint.get("target_path"), str):
+            # A move may have replaced the target just before interruption.
+            destination = self._check_containment(pre_checkpoint["target_path"], action_id)
+            source = self._check_containment(file_path, action_id)
+            if destination is None or source is None:
+                return BuildActionExecution(
+                    action_id=action_id, status=BuildActionStatus.EFFECT_UNCERTAIN,
+                    error="move reconciliation path escaped the workspace",
+                )
+            target = Path(destination)
+            if (
+                target.is_file()
+                and not Path(source).exists()
+                and expected_post_digest is not None
+                and hashlib.sha256(target.read_bytes()).hexdigest() == expected_post_digest
+                and pre_checkpoint.get("expected_post_digest") == expected_post_digest
+            ):
+                self._clear_pre_effect_checkpoint(action_id)
+                self._receipts.issue_verified(
+                    f"reconciled-{action_id}",
+                    "host",
+                    f"post_effect_reconciled:{action_id}:{expected_post_digest}",
+                )
+                return BuildActionExecution(
+                    action_id=action_id,
+                    status=BuildActionStatus.COMPLETED,
+                    post_image_digest=expected_post_digest,
+                )
+            return BuildActionExecution(
+                action_id=action_id, status=BuildActionStatus.EFFECT_UNCERTAIN,
+                error="move effect not independently reconciled",
+            )
         if pre_checkpoint is not None:
             # A crash occurred during this effect
             full_path = Path(os.path.realpath(str(self._workspace / file_path)))
