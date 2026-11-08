@@ -56,7 +56,7 @@ addopts = "-q"
 
 [tool.deptry]
 known_first_party = ["agent", "mvp", "api_fundamentals"]
-extend_exclude = ["deployment/modal"]
+extend_exclude = ["deployment/modal", ".transfer-quarantine", ".pytest-", "video/examples"]
 
 [tool.deptry.per_rule_ignores]
 DEP001 = ["modal"]

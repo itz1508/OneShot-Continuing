@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import json
+from hashlib import sha256
+
 import yaml
 
 from agent.contracts.research import (
@@ -32,6 +35,16 @@ class CatalogSample:
     research_checklist: tuple[str, ...]
     success_criteria: tuple[str, ...]
     fixture_blueprint: dict[str, Any] | None = None
+    is_synthetic: bool = True
+
+
+@dataclass(frozen=True)
+class CatalogLineage:
+    """Synthetic template provenance, not verified Research evidence."""
+
+    input_id: str
+    catalog_id: str
+    source_digest: str
     is_synthetic: bool = True
 
 
@@ -216,3 +229,31 @@ class ResearchCatalog:
             if s.catalog_id == catalog_id:
                 return s
         return None
+
+
+    def lineage_for(self, input_id: str, match: CatalogMatch) -> CatalogLineage:
+        """Bind the exact synthetic sample contents to the user input ID."""
+        if not input_id:
+            raise ValueError("catalog lineage requires an input ID")
+        sample = self.get_sample(match.catalog_id)
+        if sample is None or sample.version != match.catalog_version or not match.is_synthetic:
+            raise ValueError("catalog lineage requires an existing matching synthetic sample")
+        payload = json.dumps(
+            {
+                "id": sample.catalog_id,
+                "version": sample.version,
+                "category": sample.category,
+                "intents": sample.matching_intents,
+                "keywords": sample.matching_keywords,
+                "checklist": sample.research_checklist,
+                "criteria": sample.success_criteria,
+                "fixture_blueprint": sample.fixture_blueprint,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return CatalogLineage(
+            input_id=input_id,
+            catalog_id=sample.catalog_id,
+            source_digest=sha256(payload).hexdigest(),
+        )
