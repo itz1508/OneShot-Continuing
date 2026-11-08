@@ -435,9 +435,10 @@ class EffectExecutor:
         """
         # Check for durable pre-effect checkpoint
         pre_checkpoint = self._has_pre_effect_checkpoint(action_id)
-        if pre_checkpoint is not None and isinstance(pre_checkpoint.get("target_path"), str):
+        move_target = pre_checkpoint.get("target_path") if pre_checkpoint is not None else None
+        if isinstance(move_target, str):
             # A move may have replaced the target just before interruption.
-            destination = self._check_containment(pre_checkpoint["target_path"], action_id)
+            destination = self._check_containment(move_target, action_id)
             source = self._check_containment(file_path, action_id)
             if destination is None or source is None:
                 return BuildActionExecution(
