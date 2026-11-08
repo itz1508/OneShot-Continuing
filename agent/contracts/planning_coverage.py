@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent.contracts.common import ContractModel
+from agent.contracts.coverage import PlanningCoverage
 from agent.contracts.planning import IssueType
 from agent.contracts.validation.structural import CONCERNS
 
@@ -40,14 +40,6 @@ SCANNER_CATEGORIES: dict[str, tuple[IssueType, ...]] = {
     "paths": ("security", "recovery"),
     "coverage": ("verifiability",),
 }
-
-
-class PlanningCoverage(ContractModel):
-    """Sources for every category, including categories left uncovered."""
-
-    category_sources: dict[IssueType, tuple[str, ...]]
-    uncovered_categories: tuple[IssueType, ...] = ()
-    unmapped_scanner_capabilities: tuple[str, ...] = ()
 
 
 def planning_coverage(

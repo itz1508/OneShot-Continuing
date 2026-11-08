@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 
 from agent.contracts.common import ArtifactRef, ContractModel, Sha256
 from agent.contracts.host import ReceiptRef
-from agent.contracts.planning_coverage import PlanningCoverage
+from agent.contracts.coverage import PlanningCoverage
 
 
 class ScannerOutcome(StrEnum):
