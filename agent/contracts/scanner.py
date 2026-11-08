@@ -8,8 +8,8 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from agent.contracts.common import ArtifactRef, ContractModel, Sha256
-from agent.contracts.host import ReceiptRef
 from agent.contracts.coverage import PlanningCoverage
+from agent.contracts.host import ReceiptRef
 
 
 class ScannerOutcome(StrEnum):
