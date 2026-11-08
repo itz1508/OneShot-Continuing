@@ -12,4 +12,3 @@ class PlanningCoverage(ContractModel):
     category_sources: dict[IssueType, tuple[str, ...]]
     uncovered_categories: tuple[IssueType, ...] = ()
     unmapped_scanner_capabilities: tuple[str, ...] = ()
-

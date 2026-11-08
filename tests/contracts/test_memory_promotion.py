@@ -132,7 +132,9 @@ def setup_case(tmp_path, *, success=True):
                 exit_code=0 if success else 1,
                 outcome=CriterionResult.VALID if success else CriterionResult.NOT_VALID,
                 evidence_refs=("EVD-001",) if success else (),
-                issue_input=None if success else ValidationIssueInput(
+                issue_input=None
+                if success
+                else ValidationIssueInput(
                     issue_type="verifiability",
                     reason="independent E2E failed",
                     evidence_status=DiagnosticStatus.NOT_VALID,

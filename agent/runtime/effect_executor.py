@@ -265,9 +265,7 @@ class EffectExecutor:
         if wave is not None:
             wave_blocker = self._verify_wave(wave, action_id)
             if wave_blocker is not None:
-                return BuildActionExecution(
-                    action_id=action_id, status=BuildActionStatus.BLOCKED, error=wave_blocker
-                )
+                return BuildActionExecution(action_id=action_id, status=BuildActionStatus.BLOCKED, error=wave_blocker)
 
         try:
             if action_kind == "move" and source_path and target_path:
@@ -281,26 +279,27 @@ class EffectExecutor:
                 destination = Path(resolved_target)  # type: ignore[arg-type]
                 if source.is_symlink() or destination.is_symlink() or not source.is_file():
                     return BuildActionExecution(
-                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        action_id=action_id,
+                        status=BuildActionStatus.BLOCKED,
                         error="move requires a regular source and non-symlink target",
                     )
                 actual = hashlib.sha256(source.read_bytes()).hexdigest()
                 if actual != expected_source_digest:
                     return BuildActionExecution(
-                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        action_id=action_id,
+                        status=BuildActionStatus.BLOCKED,
                         error="move source digest changed at effect time",
                     )
                 # The target must have been pinned absent; never replace a
                 # changed or pre-existing destination with a plan move.
                 if wave.expected_preimages.get(target_path) is not None or destination.exists():
                     return BuildActionExecution(
-                        action_id=action_id, status=BuildActionStatus.BLOCKED,
+                        action_id=action_id,
+                        status=BuildActionStatus.BLOCKED,
                         error="move destination is not pinned absent",
                     )
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                self._pre_effect_checkpoint(
-                    action_id, source_path, actual, actual, target_path=target_path
-                )
+                self._pre_effect_checkpoint(action_id, source_path, actual, actual, target_path=target_path)
                 os.replace(source, destination)
                 self._clear_pre_effect_checkpoint(action_id)
                 return BuildActionExecution(
@@ -442,7 +441,8 @@ class EffectExecutor:
             source = self._check_containment(file_path, action_id)
             if destination is None or source is None:
                 return BuildActionExecution(
-                    action_id=action_id, status=BuildActionStatus.EFFECT_UNCERTAIN,
+                    action_id=action_id,
+                    status=BuildActionStatus.EFFECT_UNCERTAIN,
                     error="move reconciliation path escaped the workspace",
                 )
             target = Path(destination)
@@ -465,7 +465,8 @@ class EffectExecutor:
                     post_image_digest=expected_post_digest,
                 )
             return BuildActionExecution(
-                action_id=action_id, status=BuildActionStatus.EFFECT_UNCERTAIN,
+                action_id=action_id,
+                status=BuildActionStatus.EFFECT_UNCERTAIN,
                 error="move effect not independently reconciled",
             )
         if pre_checkpoint is not None:

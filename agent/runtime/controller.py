@@ -349,9 +349,9 @@ class HostController:
                     "planning_coverage": (
                         planning_coverage(
                             structural_concerns=CONCERNS, scanner_capabilities=result.capabilities_checked
-                        )
-                        .model_dump(mode="json")
-                        if pinned else None
+                        ).model_dump(mode="json")
+                        if pinned
+                        else None
                     ),
                 }
             )

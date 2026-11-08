@@ -229,7 +229,6 @@ class ResearchCatalog:
                 return s
         return None
 
-
     def lineage_for(self, input_id: str, match: CatalogMatch) -> CatalogLineage:
         """Bind the exact synthetic sample contents to the user input ID."""
         if not input_id:
