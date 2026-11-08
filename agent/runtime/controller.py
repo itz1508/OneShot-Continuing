@@ -347,7 +347,9 @@ class HostController:
                     "requested_capabilities": capabilities,
                     "registry_ref": pinned.ref.model_dump(mode="json") if pinned else None,
                     "planning_coverage": (
-                        planning_coverage(structural_concerns=CONCERNS, scanner_capabilities=result.capabilities_checked)
+                        planning_coverage(
+                            structural_concerns=CONCERNS, scanner_capabilities=result.capabilities_checked
+                        )
                         .model_dump(mode="json")
                         if pinned else None
                     ),

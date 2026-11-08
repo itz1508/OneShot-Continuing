@@ -7,12 +7,11 @@ synthetic with no factual authority.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
-
-import json
-from hashlib import sha256
 
 import yaml
 

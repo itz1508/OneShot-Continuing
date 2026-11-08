@@ -1,7 +1,6 @@
 """Synthetic pinned Scanner checks for host gate tests only."""
 
 from agent.contracts.scanner import ScannerEvidence
-from agent.runtime.scanner_evidence import persist_scan_result
 from agent.contracts.tool_registry import SandboxProfile, ToolEffect, ToolInvocation, ToolRegistrySnapshot, ToolSpec
 from agent.runtime.controller import HostController
 from agent.runtime.host_gap_analyzer import StructuralGapOutcome
@@ -10,6 +9,7 @@ from agent.runtime.scanner_check_registry import (
     ScannerCheckRegistrySnapshot,
     pin_scanner_check_registry,
 )
+from agent.runtime.scanner_evidence import persist_scan_result
 from agent.runtime.tool_registry import pin_tool_registry
 
 

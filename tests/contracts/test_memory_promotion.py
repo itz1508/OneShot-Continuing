@@ -8,9 +8,9 @@ from agent.contracts.build_memory import KnowledgeKind, VerifiedBuildKnowledge
 from agent.contracts.build_validation import (
     BuildValidationRecord,
     CriterionResult,
-    ValidationIssueInput,
     E2EResult,
     ObservedCriterionResult,
+    ValidationIssueInput,
 )
 from agent.contracts.common import ArtifactRef, DiagnosticStatus
 from agent.contracts.host import (

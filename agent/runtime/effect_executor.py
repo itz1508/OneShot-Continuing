@@ -151,7 +151,11 @@ class EffectExecutor:
     def _verify_wave(self, wave: BuildWave, action_id: str) -> str | None:
         """Recheck the exact pinned preimages and predecessor receipt at effect time."""
         if wave.wave_index > 1:
-            if self._artifacts is None or wave.previous_wave_result_ref is None or wave.previous_wave_receipt_ref is None:
+            if (
+                self._artifacts is None
+                or wave.previous_wave_result_ref is None
+                or wave.previous_wave_receipt_ref is None
+            ):
                 return "prior wave evidence is unavailable"
             ref = wave.previous_wave_result_ref
             receipt = wave.previous_wave_receipt_ref
