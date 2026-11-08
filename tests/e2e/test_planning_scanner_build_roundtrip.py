@@ -110,13 +110,16 @@ def test_planning_repair_revalidation_and_real_build_effects(tmp_path: Path) -> 
     # A prior gap receipt is immutable but must not authorize a changed candidate.
     with pytest.raises(TransitionError, match="different candidate"):
         host.scan_planning_candidate(
-            "task-001", "run-001", repaired, "fixture-repository",
-            ("dependency_readiness",), gap_1.result_ref, gap_1.completion_receipt_ref,
+            "task-001",
+            "run-001",
+            repaired,
+            "fixture-repository",
+            ("dependency_readiness",),
+            gap_1.result_ref,
+            gap_1.completion_receipt_ref,
         )
 
-    request_2 = request.model_copy(
-        update={"candidate_specification_ref": repaired, "request_revision": 2}
-    )
+    request_2 = request.model_copy(update={"candidate_specification_ref": repaired, "request_revision": 2})
     gap_2 = host.run_structural_gap_analysis(request_2, walking_skeleton_runner=runner)
     assert gap_2.completion_receipt_ref is not None
     checked = host.scan_planning_candidate(
@@ -139,9 +142,7 @@ def test_planning_repair_revalidation_and_real_build_effects(tmp_path: Path) -> 
     # Current legacy route accepts an immutable revised plan but cannot prove
     # the Freeze/Scanner approval chain: this is explicitly NOT Build readiness.
     revised = PlanningRecord.model_validate_json(host.artifact_store.get_verified(repaired.artifact_id, 2))
-    lock = PackageLock(host.artifact_store, host.receipt_store).lock(
-        "roundtrip", research, audit, repaired
-    )
+    lock = PackageLock(host.artifact_store, host.receipt_store).lock("roundtrip", research, audit, repaired)
     lock_subject = f"{research.artifact_digest}:{audit.artifact_digest}:{repaired.artifact_digest}"
     admission = BuildAdmission(host.receipt_store, host.artifact_store).admit(
         "roundtrip",
@@ -168,8 +169,12 @@ def test_planning_repair_revalidation_and_real_build_effects(tmp_path: Path) -> 
         expected_preimages=first_todo.expected_preimages,
     )
     first = executor.execute_admitted(
-        "producer", "create", admission, target_path="producer.py",
-        content="value = 1\n", wave=first_wave,
+        "producer",
+        "create",
+        admission,
+        target_path="producer.py",
+        content="value = 1\n",
+        wave=first_wave,
     )
     assert first.status is BuildActionStatus.COMPLETED
     assert (workspace / "producer.py").read_text() == "value = 1\n"
@@ -190,13 +195,15 @@ def test_planning_repair_revalidation_and_real_build_effects(tmp_path: Path) -> 
         batches=(BuildBatch(batch_id="batch-2", tasks=(BuildTask(task_id="consumer", todo=second_todo),)),),
         expected_preimages=second_todo.expected_preimages,
         previous_wave_result_ref=prior_ref,
-        previous_wave_receipt_ref=ReceiptRef(
-            receipt_id="wave-1-receipt", receipt_digest=prev_digest, issuer_id="host"
-        ),
+        previous_wave_receipt_ref=ReceiptRef(receipt_id="wave-1-receipt", receipt_digest=prev_digest, issuer_id="host"),
     )
     second = executor.execute_admitted(
-        "consumer", "create", admission, target_path="consumer.py",
-        content="from producer import value\nanswer = value + 1\n", wave=second_wave,
+        "consumer",
+        "create",
+        admission,
+        target_path="consumer.py",
+        content="from producer import value\nanswer = value + 1\n",
+        wave=second_wave,
     )
     assert second.status is BuildActionStatus.COMPLETED
     assert (workspace / "consumer.py").is_file()
