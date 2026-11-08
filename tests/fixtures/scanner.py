@@ -9,6 +9,7 @@ from agent.runtime.scanner_check_registry import (
     ScannerCheckRegistrySnapshot,
     pin_scanner_check_registry,
 )
+from agent.runtime.scanner_evidence import persist_scan_result
 from agent.runtime.tool_registry import pin_tool_registry
 
 
@@ -59,5 +60,12 @@ def passing_scan(controller: HostController, gap: StructuralGapOutcome) -> Scann
         gap.result_ref,
         gap.completion_receipt_ref,
     )
-    assert outcome.evidence is not None
-    return outcome.evidence
+    assert controller.scanner_checks is not None
+    persisted = persist_scan_result(
+        controller.artifact_store,
+        controller.receipt_store,
+        outcome,
+        controller.scanner_checks,
+    )
+    assert persisted.evidence is not None
+    return persisted.evidence

@@ -16,8 +16,10 @@ from pydantic import BaseModel, Field
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import HostDispatchEnvelope, HostDispatchResult, ReceiptRef
 from agent.contracts.planning import PlanningRecord
+from agent.contracts.planning_coverage import planning_coverage
 from agent.contracts.scanner import CriterionResult, ScannerOutcome, ScannerResult
 from agent.contracts.validation.planning import validate_action_graph
+from agent.contracts.validation.structural import CONCERNS
 from agent.contracts.work_todo import TodoList, WorkBinding
 from agent.runtime.artifact_store import ArtifactStore
 from agent.runtime.authorization import AuthorizationEngine, Capability
@@ -35,6 +37,7 @@ from agent.runtime.host_gap_analyzer import (
 from agent.runtime.providers.registry import ProviderRegistry
 from agent.runtime.receipt_store import ReceiptStore
 from agent.runtime.recovery import BoundedRecovery
+from agent.runtime.scanner_check_registry import ScannerCheckRegistry
 from agent.runtime.scanner_gateway import ScannerGateway
 from agent.runtime.scanner_telemetry import scanner_span
 from agent.runtime.work_todo import WorkTodoError, WorkTodoManager
@@ -95,6 +98,7 @@ class HostController:
         self.work_todos = WorkTodoManager(self.artifact_store, self.event_store)
         self.checkpoint_store = CheckpointStore(self.state_root)
         self.scanner = ScannerGateway(self.artifact_store)
+        self.scanner_checks: ScannerCheckRegistry | None = None
         self.gap_analyzer = HostGapAnalyzer(self.artifact_store, self.receipt_store)
         self.recovery = BoundedRecovery()
         self.providers = ProviderRegistry()
@@ -104,6 +108,10 @@ class HostController:
             else (str(workspace_root), str(self.state_root))
         )
         self._workspace_root = workspace_root or self.state_root / "workspace"
+
+    def configure_scanner_checks(self, registry_ref: ArtifactRef) -> None:
+        """Pin and validate the host-owned read-only scanner check registry."""
+        self.scanner_checks = ScannerCheckRegistry(self.artifact_store, registry_ref)
 
     def advance_stage(
         self,
@@ -327,7 +335,26 @@ class HostController:
         try:
             with scanner_span(task_id, run_id, candidate_ref.artifact_id):
                 result = self.scanner.scan_exact(candidate_ref, repository_identity, capabilities, on_event=publish)
-            result = result.model_copy(update={"request_id": scan_id, "candidate_ref": candidate_ref})
+            pinned = self.scanner_checks
+            result = ScannerResult.model_validate(
+                {
+                    **result.model_dump(mode="json"),
+                    "request_id": scan_id,
+                    "candidate_ref": candidate_ref.model_dump(mode="json"),
+                    "task_id": task_id,
+                    "run_id": run_id,
+                    "repository_identity": repository_identity,
+                    "requested_capabilities": capabilities,
+                    "registry_ref": pinned.ref.model_dump(mode="json") if pinned else None,
+                    "planning_coverage": (
+                        planning_coverage(
+                            structural_concerns=CONCERNS, scanner_capabilities=result.capabilities_checked
+                        ).model_dump(mode="json")
+                        if pinned
+                        else None
+                    ),
+                }
+            )
             digest = self.artifact_store.put_immutable(result, scan_id, 1, "scanner_result", "1.1")
         except Exception:
             publish("scanner_interrupted", {"message": "Scanner invocation interrupted before result persistence"})

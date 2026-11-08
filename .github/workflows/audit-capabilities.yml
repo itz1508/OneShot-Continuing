@@ -37,7 +37,12 @@ jobs:
         run: uv run --no-sync pytest tests/audit -q -rs
       - name: Audit checked-out repository
         run: |
+          set +e
           uv run --no-sync python -m agent.audit --root . --scope . --request "Audit accepted Research integration and repository capabilities" > audit-report.json
+          audit_status=$?
+          set -e
+          uv run --no-sync python -c 'import json; p=json.load(open("audit-report.json")); print("Audit disposition:",p["disposition"]); print("Limitations:",p.get("limitations",[]))'
+          exit "$audit_status"
           uv run --no-sync python -c 'import json; p=json.load(open("audit-report.json")); print("Disposition:",p["disposition"]); print("Findings:",len(p["findings"])); [print(f["code"], f["path"], f["line"]) for f in p["findings"][:80]]'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from agent.contracts.common import ArtifactRef, ContractModel, Sha256
+from agent.contracts.coverage import PlanningCoverage
 from agent.contracts.host import ReceiptRef
 
 
@@ -129,6 +130,13 @@ class ScannerEvidenceRequest(ContractModel):
     reason: str = Field(min_length=1)
 
 
+class ScannerEvidence(ContractModel):
+    """Host-issued receipt for a persisted scanner result."""
+
+    result_ref: ArtifactRef
+    receipt_ref: ReceiptRef
+
+
 class TracedDetectorResult(ContractModel):
     findings: tuple[ScannerFinding, ...] = ()
     trace_steps: tuple[ScannerTraceStep, ...] = ()
@@ -141,6 +149,12 @@ class TracedDetectorResult(ContractModel):
 class ScannerResult(ContractModel):
     request_id: str = Field(min_length=1)
     outcome: ScannerOutcome
+    task_id: str = ""
+    run_id: str = ""
+    repository_identity: str = ""
+    requested_capabilities: tuple[str, ...] = ()
+    registry_ref: ArtifactRef | None = None
+    planning_coverage: PlanningCoverage | None = None
     capabilities_checked: tuple[str, ...] = ()
     capabilities_not_checked: tuple[str, ...] = ()
     findings: tuple[ScannerFinding, ...] = ()

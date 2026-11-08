@@ -40,6 +40,25 @@ def persist_scan_result(
 ) -> ScannerScanOutcome:
     if result.registry_ref != registry.ref or result.candidate_ref is None:
         raise ValueError("Scanner result has no matching verified registry or candidate")
+    # Never issue a receipt for a caller-supplied unexecuted PASS claim.
+    persisted = artifacts.get_verified(result.request_id, 1)
+    if canonical_bytes(result) != persisted:
+        # Reject forged coverage projections without persisting or signing them.
+        # Expose only the previously verified authoritative result reference.
+        return ScannerScanOutcome(
+            result=ScannerResult.model_validate_json(persisted),
+            result_ref=ArtifactRef(
+                artifact_id=result.request_id,
+                artifact_revision=1,
+                artifact_digest=digest_raw(persisted),
+                contract_id="scanner_result",
+                contract_version="1.1",
+                serializer_profile=SERIALIZER_PROFILE,
+            ),
+            evidence=None,
+        )
+    if not result.task_id or not result.run_id or not result.repository_identity:
+        raise ValueError("Scanner result missing host identity")
     result_id = (
         f"scanner-result:{result.task_id}:{result.run_id}:"
         f"{result.candidate_ref.artifact_id}:{result.candidate_ref.artifact_revision}:"

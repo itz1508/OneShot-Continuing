@@ -126,11 +126,12 @@ class HostMemoryManager:
             not validation.criterion_results
             or not validation.e2e_results
             or any(
-                result.outcome is not CriterionResult.PASS or not result.evidence_refs
+                result.outcome is not CriterionResult.VALID or not result.evidence_refs
                 for result in validation.criterion_results
             )
             or any(
-                result.outcome is not CriterionResult.PASS or result.exit_code != 0 for result in validation.e2e_results
+                result.outcome is not CriterionResult.VALID or result.exit_code != 0 or not result.evidence_refs
+                for result in validation.e2e_results
             )
             or any(step.status is not StepStatus.COMPLETED for step in validation.step_results)
         ):
