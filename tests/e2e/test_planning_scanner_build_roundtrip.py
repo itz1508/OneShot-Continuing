@@ -15,17 +15,14 @@ from pydantic import BaseModel
 
 from agent.contracts.build import BuildActionStatus, BuildRecord
 from agent.contracts.build_schedule import BuildBatch, BuildTask, BuildWave, VerifiedWaveResult
-from agent.contracts.build_validation import (
-    BuildValidationRecord,
-    CriterionResult as VerificationResult,
-    E2EResult,
-    ObservedCriterionResult,
-)
+from agent.contracts.build_validation import BuildValidationRecord, E2EResult, ObservedCriterionResult
+from agent.contracts.build_validation import CriterionResult as VerificationResult
 from agent.contracts.common import ArtifactRef
 from agent.contracts.host import ReceiptRef
 from agent.contracts.planning import PlanningRecord
 from agent.contracts.scanner import CriterionValidity, ScannerOutcome, ScannerResult
 from agent.contracts.task_todo import TaskTodo
+from agent.runtime.authorization import Capability
 from agent.runtime.build_admission import BuildAdmission
 from agent.runtime.canonical_serialization import SERIALIZER_PROFILE, digest_raw
 from agent.runtime.controller import HostController, Stage, TransitionError
@@ -34,7 +31,6 @@ from agent.runtime.package_lock import PackageLock
 from tests.e2e.test_real_workflow import _advance_with_receipt
 from tests.fixtures.structural_gap import build_gap_inputs
 from tests.scanner.test_decision_trace import artifact_ref, make_planning_record, revised_record
-from agent.runtime.authorization import Capability
 
 
 class Evidence(BaseModel):
