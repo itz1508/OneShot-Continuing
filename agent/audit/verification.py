@@ -1,25 +1,5 @@
-"""Discover verification surfaces; never claim tests were executed."""
+"""Compatibility API: one implementation lives in agent.skills.auditor.verification."""
 
-from __future__ import annotations
-
-from pathlib import Path
-
-from agent.audit.core import Finding
-
-
-def scan_verification(root: Path, scope: Path) -> list[Finding]:
-    tests = root / "tests"
-    if scope == root and (not tests.exists() or not any(tests.rglob("test_*.py"))):
-        return [
-            Finding(
-                "verification",
-                "NO_PYTHON_TESTS_DISCOVERED",
-                "verified_observation",
-                "medium",
-                "tests",
-                0,
-                "No conventional Python test modules discovered; test coverage remains unverified.",
-                "",
-            )
-        ]
-    return []
+from agent.skills.auditor.verification import (
+    scan_verification as scan_verification,
+)

@@ -14,7 +14,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["agent", "mvp", "api_fundamentals"]
+packages = ["agent", "system", "mvp", "api_fundamentals"]
 
 [project.optional-dependencies]
 meta = ["openai>=1.0"]
@@ -49,14 +49,14 @@ known-first-party = ["agent"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-packages = ["agent"]
+packages = ["agent", "system"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
 
 [tool.deptry]
-known_first_party = ["agent", "mvp", "api_fundamentals"]
+known_first_party = ["agent", "system", "mvp", "api_fundamentals"]
 extend_exclude = ["deployment/modal", ".transfer-quarantine", ".pytest-", "video/examples"]
 
 [tool.deptry.per_rule_ignores]
